@@ -11,6 +11,24 @@ namespace Kzrnm.Numerics.Test
         public static IEnumerable<object[]> Values()
         {
             yield return new object[] { "1", "2" };
+
+            yield return new object[] { "4149515568880992958512407863691161151012446232242436899995657329690652811412908146399707048947103794288197886611300789182395151075411775307886874834113963687061181803401509523685376", "4149515568880992958512407863691161151012446232242436899995657329690652811412908146399707048947103794288197886611300789182395151075411775307886874834113963687061181803401507376201728" };
+            yield return new object[] { "4149515568880992958512407863691161151012446232242436899995657329690652811412908146399707048947103794288197886611300789182395151075411775307886874834113963687061181803401507376201728", "4149515568880992958512407863691161151012446232242436899995657329690652811412908146399707048947103794288197886611300789182395151075411775307886874834113963687061181803401509523685376" };
+
+            foreach (var sign in new[] { "", "-" })
+            {
+                yield return new object[] { $"{sign}{int.MaxValue}", "1" };
+                yield return new object[] { "1", $"{sign}{int.MaxValue}" };
+                yield return new object[] { $"{sign}{int.MaxValue}", "-1" };
+                yield return new object[] { "-1", $"{sign}{int.MaxValue}" };
+            }
+            {
+                yield return new object[] { $"{int.MinValue}", "1" };
+                yield return new object[] { "1", $"{int.MinValue}" };
+                yield return new object[] { $"{int.MinValue}", "-1" };
+                yield return new object[] { "-1", $"{int.MinValue}" };
+            }
+
             for (int i = 6; i < 8; i++)
             {
                 var ss = new string('1', 1 << i);

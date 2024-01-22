@@ -5,6 +5,23 @@
         public static IEnumerable<object[]> Values()
         {
             yield return new object[] { "1", "2" };
+
+            yield return new object[] { "4149515568880992958512407863691161151012446232242436899995657329690652811412908146399707048947103794288197886611300789182395151075411775307886874834113963687061181803401509523685376", "4149515568880992958512407863691161151012446232242436899995657329690652811412908146399707048947103794288197886611300789182395151075411775307886874834113963687061181803401507376201728" };
+
+            foreach (var sign in new[] { "", "-" })
+            {
+                yield return new object[] { $"{sign}{int.MaxValue}", "1" };
+                yield return new object[] { "1", $"{sign}{int.MaxValue}" };
+                yield return new object[] { $"{sign}{int.MaxValue}", "-1" };
+                yield return new object[] { "-1", $"{sign}{int.MaxValue}" };
+            }
+            {
+                yield return new object[] { $"{int.MinValue}", "1" };
+                yield return new object[] { "1", $"{int.MinValue}" };
+                yield return new object[] { $"{int.MinValue}", "-1" };
+                yield return new object[] { "-1", $"{int.MinValue}" };
+            }
+
             for (int i = 6; i < 8; i++)
             {
                 var ss = new string('1', 1 << i);
@@ -45,8 +62,20 @@
                 .Be((OrigBigInteger.Parse(s) - OrigBigInteger.Parse(t)).ToString());
         }
 
+        public static IEnumerable<object[]> HalfValues()
+        {
+            var rnd = new Random(227);
+            for (int i = 0; i < 200; i++)
+            {
+                var length = rnd.Next(18 * 32, 2000);
+                yield return new object[] { rnd.GetRandomDigits(length * 2), rnd.GetRandomDigits(length) };
+                yield return new object[] { rnd.GetRandomDigits(length * 2 + 1), rnd.GetRandomDigits(length) };
+            }
+        }
+
         [Theory]
         [MemberData(nameof(Values))]
+        [MemberData(nameof(HalfValues))]
         public void Multiply(string s, string t)
         {
             (BigIntegerDecimal.Parse(s) * BigIntegerDecimal.Parse(t)).ToString()
@@ -54,19 +83,9 @@
                 .Be((OrigBigInteger.Parse(s) * OrigBigInteger.Parse(t)).ToString());
         }
 
-        public static IEnumerable<object[]> DivData()
-        {
-            var rnd = new Random(227);
-            for (int i = 0; i < 200; i++)
-            {
-                var length = rnd.Next(18 * 32, 2000);
-                yield return new object[] { rnd.GetRandomDigits(length * 2), rnd.GetRandomDigits(length) };
-            }
-        }
-
         [Theory]
         [MemberData(nameof(Values))]
-        [MemberData(nameof(DivData))]
+        [MemberData(nameof(HalfValues))]
         public void DivRem(string s, string t)
         {
             var (quo, rem) = OrigBigInteger.DivRem(OrigBigInteger.Parse(s), OrigBigInteger.Parse(t));

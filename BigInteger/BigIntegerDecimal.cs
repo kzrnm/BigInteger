@@ -52,6 +52,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             var uv = NumericsHelpers.Abs(value);
             if (value <= -B || B <= value)
             {
+                _sign = Math.Sign(value);
                 _dig = new ulong[2];
                 (_dig[1], _dig[0]) = Math.DivRem(uv, BigIntegerCalculator.Base);
             }
