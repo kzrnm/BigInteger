@@ -93,7 +93,7 @@ public class BigIntegerToString
     [Benchmark(Baseline = true)]
     public string Orig() => orig.ToString();
 
-    [Benchmark(Baseline = true)]
+    [Benchmark]
     public string New() => my.ToString();
 }
 
