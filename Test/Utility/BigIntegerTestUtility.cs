@@ -13,5 +13,14 @@ namespace Kzrnm.Numerics.Test
         {
             return new NumericAssertions<MyBigInteger>(a);
         }
+
+        public static string GetRandomDigits(this Random rnd, int length)
+        {
+            var chs = Enumerable.Repeat(rnd, length - 1)
+                .Select(r => (char)('0' + r.Next(10)))
+                .Prepend((char)('1' + rnd.Next(9)))
+                .ToArray();
+            return new string(chs);
+        }
     }
 }

@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Kzrnm.Numerics.Logic;
+using System;
 using System.Buffers;
 using System.Buffers.Binary;
 using System.Collections.Generic;
@@ -3956,7 +3957,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
         static int INumberBase<BigInteger>.Radix => 2;
 
         /// <inheritdoc cref="INumberBase{TSelf}.CreateChecked{TOther}(TOther)" />
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(256)]
         public static BigInteger CreateChecked<TOther>(TOther value)
             where TOther : INumberBase<TOther>
         {
@@ -3975,7 +3976,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
         }
 
         /// <inheritdoc cref="INumberBase{TSelf}.CreateSaturating{TOther}(TOther)" />
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(256)]
         public static BigInteger CreateSaturating<TOther>(TOther value)
             where TOther : INumberBase<TOther>
         {
@@ -3994,7 +3995,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
         }
 
         /// <inheritdoc cref="INumberBase{TSelf}.CreateTruncating{TOther}(TOther)" />
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(256)]
         public static BigInteger CreateTruncating<TOther>(TOther value)
             where TOther : INumberBase<TOther>
         {
@@ -4144,10 +4145,10 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
         static BigInteger INumberBase<BigInteger>.MinMagnitudeNumber(BigInteger x, BigInteger y) => MinMagnitude(x, y);
 
         /// <inheritdoc cref="INumberBase{TSelf}.TryConvertFromChecked{TOther}(TOther, out TSelf)" />
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(256)]
         static bool INumberBase<BigInteger>.TryConvertFromChecked<TOther>(TOther value, out BigInteger result) => TryConvertFromChecked(value, out result);
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(256)]
         private static bool TryConvertFromChecked<TOther>(TOther value, out BigInteger result)
             where TOther : INumberBase<TOther>
         {
@@ -4261,10 +4262,10 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
         }
 
         /// <inheritdoc cref="INumberBase{TSelf}.TryConvertFromSaturating{TOther}(TOther, out TSelf)" />
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(256)]
         static bool INumberBase<BigInteger>.TryConvertFromSaturating<TOther>(TOther value, out BigInteger result) => TryConvertFromSaturating(value, out result);
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(256)]
         private static bool TryConvertFromSaturating<TOther>(TOther value, out BigInteger result)
             where TOther : INumberBase<TOther>
         {
@@ -4378,10 +4379,10 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
         }
 
         /// <inheritdoc cref="INumberBase{TSelf}.TryConvertFromTruncating{TOther}(TOther, out TSelf)" />
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(256)]
         static bool INumberBase<BigInteger>.TryConvertFromTruncating<TOther>(TOther value, out BigInteger result) => TryConvertFromTruncating(value, out result);
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(256)]
         private static bool TryConvertFromTruncating<TOther>(TOther value, out BigInteger result)
             where TOther : INumberBase<TOther>
         {
@@ -4495,7 +4496,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
         }
 
         /// <inheritdoc cref="INumberBase{TSelf}.TryConvertToChecked{TOther}(TSelf, out TOther)" />
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(256)]
         static bool INumberBase<BigInteger>.TryConvertToChecked<TOther>(BigInteger value, [MaybeNullWhen(false)] out TOther result)
         {
             if (typeof(TOther) == typeof(byte))
@@ -4608,7 +4609,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
         }
 
         /// <inheritdoc cref="INumberBase{TSelf}.TryConvertToSaturating{TOther}(TSelf, out TOther)" />
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(256)]
         static bool INumberBase<BigInteger>.TryConvertToSaturating<TOther>(BigInteger value, [MaybeNullWhen(false)] out TOther result)
         {
             if (typeof(TOther) == typeof(byte))
@@ -4795,7 +4796,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
         }
 
         /// <inheritdoc cref="INumberBase{TSelf}.TryConvertToTruncating{TOther}(TSelf, out TOther)" />
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(256)]
         static bool INumberBase<BigInteger>.TryConvertToTruncating<TOther>(BigInteger value, [MaybeNullWhen(false)] out TOther result)
         {
             if (typeof(TOther) == typeof(byte))

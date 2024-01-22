@@ -38,7 +38,7 @@ namespace Kzrnm.Numerics
         public static string Overflow_Decimal => nameof(Overflow_Decimal);
         public static string Overflow_BigIntInfinity => nameof(Overflow_BigIntInfinity);
         public static string Format_TooLarge => nameof(Format_TooLarge);
-        public static string Format(params object[] _) => nameof(Format);
+        public static string Format(params object?[] _) => nameof(Format);
         public static string Argument_MustBeBigInt => nameof(Argument_MustBeBigInt);
         public static string Argument_MinMaxValue => nameof(Argument_MinMaxValue);
         public static string Argument_InvalidNumberStyles => nameof(Argument_InvalidNumberStyles);

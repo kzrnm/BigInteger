@@ -278,7 +278,7 @@ using System.Globalization;
 using System.Numerics;
 using System.Runtime.InteropServices;
 
-namespace Kzrnm.Numerics
+namespace Kzrnm.Numerics.Logic
 {
     internal static partial class Number
     {

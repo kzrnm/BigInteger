@@ -7,7 +7,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace Kzrnm.Numerics
+namespace Kzrnm.Numerics.Logic
 {
     internal static partial class Number
     {

@@ -7,7 +7,7 @@ using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
 
-namespace Kzrnm.Numerics
+namespace Kzrnm.Numerics.Logic
 {
     internal static class NumericsHelpers
     {

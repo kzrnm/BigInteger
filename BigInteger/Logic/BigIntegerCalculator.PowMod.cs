@@ -5,7 +5,7 @@ using System;
 using System.Buffers;
 using System.Diagnostics;
 
-namespace Kzrnm.Numerics
+namespace Kzrnm.Numerics.Logic
 {
     internal static partial class BigIntegerCalculator
     {

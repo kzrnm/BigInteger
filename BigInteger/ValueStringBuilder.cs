@@ -169,7 +169,7 @@ namespace Kzrnm.Numerics
             _pos += count;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(256)]
         public void Append(char c)
         {
             int pos = _pos;
@@ -185,7 +185,7 @@ namespace Kzrnm.Numerics
             }
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(256)]
         public void Append(string? s)
         {
             if (s == null)
@@ -247,7 +247,7 @@ namespace Kzrnm.Numerics
             _pos += value.Length;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(256)]
         public Span<char> AppendSpan(int length)
         {
             int origPos = _pos;
@@ -303,7 +303,7 @@ namespace Kzrnm.Numerics
             }
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(256)]
         public void Dispose()
         {
             char[]? toReturn = _arrayToReturnToPool;

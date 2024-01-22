@@ -3,11 +3,16 @@
 
 using System;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
-namespace Kzrnm.Numerics.Logic
+namespace Kzrnm.Numerics.Decimal
 {
     internal static partial class BigIntegerCalculator
     {
+        internal const ulong Base = 1_000_000_000_000_000_000;
+        internal const int BaseLog = 18;
+
 #if DEBUG
         // Mutable for unit testing...
         internal static
@@ -16,7 +21,7 @@ namespace Kzrnm.Numerics.Logic
 #endif
         int StackAllocThreshold = 64;
 
-        public static int Compare(ReadOnlySpan<uint> left, ReadOnlySpan<uint> right)
+        public static int Compare(ReadOnlySpan<ulong> left, ReadOnlySpan<ulong> right)
         {
             Debug.Assert(left.Length <= right.Length || left.Slice(right.Length).Trim(0u).Length > 0);
             Debug.Assert(left.Length >= right.Length || right.Slice(left.Length).Trim(0u).Length > 0);
@@ -32,7 +37,7 @@ namespace Kzrnm.Numerics.Logic
             return left[iv] < right[iv] ? -1 : 1;
         }
 
-        private static int CompareActual(ReadOnlySpan<uint> left, ReadOnlySpan<uint> right)
+        private static int CompareActual(ReadOnlySpan<ulong> left, ReadOnlySpan<ulong> right)
         {
             if (left.Length != right.Length)
             {
@@ -52,7 +57,7 @@ namespace Kzrnm.Numerics.Logic
             return Compare(left, right);
         }
 
-        private static int ActualLength(ReadOnlySpan<uint> value)
+        private static int ActualLength(ReadOnlySpan<ulong> value)
         {
             // Since we're reusing memory here, the actual length
             // of a given value may be less then the array's length
@@ -64,7 +69,7 @@ namespace Kzrnm.Numerics.Logic
             return length;
         }
 
-        private static int Reduce(Span<uint> bits, ReadOnlySpan<uint> modulus)
+        private static int Reduce(Span<ulong> bits, ReadOnlySpan<ulong> modulus)
         {
             // Executes a modulo operation using the divide operation.
 
@@ -78,10 +83,39 @@ namespace Kzrnm.Numerics.Logic
         }
 
         [Conditional("DEBUG")]
-        public static void DummyForDebug(Span<uint> bits)
+        public static void DummyForDebug(Span<ulong> bits)
         {
             // Reproduce the case where the return value of `stackalloc uint` is not initialized to zero.
             bits.Fill(0xCD);
+        }
+
+        [MethodImpl(256)]
+        public static ulong DivRemBase(ulong v, out ulong remainder)
+        {
+            var q = v / Base;
+            remainder = v - q * Base;
+            return q;
+        }
+        [MethodImpl(256)]
+        public static UInt128 DivRemBase(UInt128 v, out ulong remainder)
+        {
+            var q = v / Base;
+            remainder = (ulong)(v - q * Base);
+            return (ulong)q;
+        }
+        [MethodImpl(256)]
+        public static long DivRemBase(long v, out ulong remainder)
+        {
+            const long B = (long)Base;
+            var q = v / B;
+            var rem = v - q * B;
+            if (rem < 0)
+            {
+                rem += B;
+                --q;
+            }
+            remainder = (ulong)rem;
+            return q;
         }
     }
 }

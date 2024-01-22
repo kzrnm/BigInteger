@@ -1,12 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace Kzrnm.Numerics.Test
+﻿namespace Kzrnm.Numerics.Test
 {
-    public class BigIntegerTests
+    public class BigIntegerDecimalTests
     {
         public static IEnumerable<object[]> Values()
         {
@@ -37,36 +31,55 @@ namespace Kzrnm.Numerics.Test
         [MemberData(nameof(Values))]
         public void Add(string s, string t)
         {
-            (MyBigInteger.Parse(s) + MyBigInteger.Parse(t)).Should().Equal(OrigBigInteger.Parse(s) + OrigBigInteger.Parse(t));
+            (BigIntegerDecimal.Parse(s) + BigIntegerDecimal.Parse(t)).ToString()
+                .Should()
+                .Be((OrigBigInteger.Parse(s) + OrigBigInteger.Parse(t)).ToString());
         }
 
         [Theory]
         [MemberData(nameof(Values))]
         public void Subtract(string s, string t)
         {
-            (MyBigInteger.Parse(s) - MyBigInteger.Parse(t)).Should().Equal(OrigBigInteger.Parse(s) - OrigBigInteger.Parse(t));
+            (BigIntegerDecimal.Parse(s) - BigIntegerDecimal.Parse(t)).ToString()
+                .Should()
+                .Be((OrigBigInteger.Parse(s) - OrigBigInteger.Parse(t)).ToString());
         }
 
         [Theory]
         [MemberData(nameof(Values))]
         public void Multiply(string s, string t)
         {
-            (MyBigInteger.Parse(s) * MyBigInteger.Parse(t)).Should().Equal(OrigBigInteger.Parse(s) * OrigBigInteger.Parse(t));
+            (BigIntegerDecimal.Parse(s) * BigIntegerDecimal.Parse(t)).ToString()
+                .Should()
+                .Be((OrigBigInteger.Parse(s) * OrigBigInteger.Parse(t)).ToString());
+        }
+
+        public static IEnumerable<object[]> DivData()
+        {
+            var rnd = new Random(227);
+            for (int i = 0; i < 200; i++)
+            {
+                var length = rnd.Next(18 * 32, 2000);
+                yield return new object[] { rnd.GetRandomDigits(length * 2), rnd.GetRandomDigits(length) };
+            }
         }
 
         [Theory]
         [MemberData(nameof(Values))]
+        [MemberData(nameof(DivData))]
         public void DivRem(string s, string t)
         {
             var (quo, rem) = OrigBigInteger.DivRem(OrigBigInteger.Parse(s), OrigBigInteger.Parse(t));
+            var quoStr = quo.ToString();
+            var remStr = rem.ToString();
 
-            var ss = MyBigInteger.Parse(s);
-            var tt = MyBigInteger.Parse(t);
-            (ss / tt).Should().Equal(quo);
-            (ss % tt).Should().Equal(rem);
-            var (quo2, rem2) = MyBigInteger.DivRem(ss, tt);
-            quo2.Should().Equal(quo);
-            rem2.Should().Equal(rem);
+            var ss = BigIntegerDecimal.Parse(s);
+            var tt = BigIntegerDecimal.Parse(t);
+            var (quo2, rem2) = BigIntegerDecimal.DivRem(ss, tt);
+            quo2.ToString().Should().Be(quoStr);
+            (ss / tt).ToString().Should().Be(quoStr);
+            rem2.ToString().Should().Be(remStr);
+            (ss % tt).ToString().Should().Be(remStr);
         }
 
         [Fact]
@@ -76,64 +89,42 @@ namespace Kzrnm.Numerics.Test
             for (int i = 0; i < 50; i++)
             {
                 var s = "1" + new string('0', i);
-                var my = MyBigInteger.Parse(s);
+                var my = BigIntegerDecimal.Parse(s);
                 var orig = OrigBigInteger.Parse(s);
-                my.Should().Equal(orig);
                 my.ToString().Should().Be(orig.ToString());
             }
             for (int i = 1; i < 50; i++)
             {
                 var s = new string('9', i);
-                var my = MyBigInteger.Parse(s);
+                var my = BigIntegerDecimal.Parse(s);
                 var orig = OrigBigInteger.Parse(s);
-                my.Should().Equal(orig);
                 my.ToString().Should().Be(orig.ToString());
             }
             for (int i = 1; i < 50; i++)
             {
                 var s = new string('1', i) + new string('0', i);
-                var my = MyBigInteger.Parse(s);
+                var my = BigIntegerDecimal.Parse(s);
                 var orig = OrigBigInteger.Parse(s);
-                my.Should().Equal(orig);
                 my.ToString().Should().Be(orig.ToString());
             }
 
             for (int i = 0; i < 50; i++)
             {
-                var bytes = new byte[rnd.Next(100, 1000)];
-                rnd.NextBytes(bytes);
-                var my = new MyBigInteger(bytes, isUnsigned: true);
-                var expected = new OrigBigInteger(bytes, isUnsigned: true);
+                var s = rnd.GetRandomDigits(rnd.Next(100, 1000));
+                var my = BigIntegerDecimal.Parse(s);
+                var expected = OrigBigInteger.Parse(s);
                 var expectedStr = expected.ToString();
                 my.ToString().Should().Be(expectedStr);
                 (-my).ToString().Should().Be($"-{expectedStr}");
-            }
-            for (int i = 0; i < 50; i++)
-            {
-                var bytes = new byte[rnd.Next(100, 1000)];
-                rnd.NextBytes(bytes);
-                var my = new MyBigInteger(bytes, isUnsigned: false);
-                var expected = new OrigBigInteger(bytes, isUnsigned: false);
-                var expectedStr = expected.ToString();
-                my.ToString().Should().Be(expectedStr);
             }
             for (int i = 1; i < 50; i++)
             {
-                var bytes = new byte[i];
-                rnd.NextBytes(bytes);
-                var my = new MyBigInteger(bytes, isUnsigned: true);
-                var expected = new OrigBigInteger(bytes, isUnsigned: true);
+                var s = rnd.GetRandomDigits(i);
+                var my = BigIntegerDecimal.Parse(s);
+                var expected = OrigBigInteger.Parse(s);
                 var expectedStr = expected.ToString();
                 my.ToString().Should().Be(expectedStr);
                 (-my).ToString().Should().Be($"-{expectedStr}");
-            }
-            for (int i = 0; i < 50; i++)
-            {
-                int num = rnd.Next() - int.MaxValue / 2;
-                var my = num;
-                var expected = num;
-                var expectedStr = expected.ToString();
-                my.ToString().Should().Be(expectedStr);
             }
         }
     }
