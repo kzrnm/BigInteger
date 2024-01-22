@@ -35,44 +35,34 @@ Released under the MIT license
 https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
 ";
 
-        internal readonly long _sign; // Do not rename (binary serialization)
+        internal readonly int _sign; // Do not rename (binary serialization)
         internal readonly ulong[]? _dig; // Do not rename (binary serialization)
 
         // We have to make a choice of how to represent int.MinValue. This is the one
         // value that fits in an int, but whose negation does not fit in an int.
         // We choose to use a large representation, so we're symmetric with respect to negation.
+        private static readonly BigIntegerDecimal s_bnMinInt = new BigIntegerDecimal(-1, new ulong[] { unchecked((uint)int.MinValue) });
         private static readonly BigIntegerDecimal s_bnOneInt = new BigIntegerDecimal(1);
         private static readonly BigIntegerDecimal s_bnZeroInt = new BigIntegerDecimal(0);
         private static readonly BigIntegerDecimal s_bnMinusOneInt = new BigIntegerDecimal(-1);
 
-
-
-        public BigIntegerDecimal(int value)
-        {
-            _sign = value;
-            _dig = null;
-            AssertValid();
-        }
-
-        public BigIntegerDecimal(uint value)
-        {
-            _sign = value;
-            _dig = null;
-            AssertValid();
-        }
-
         public BigIntegerDecimal(long value)
         {
             const long B = (long)BigIntegerCalculator.Base;
+            var uv = NumericsHelpers.Abs(value);
             if (value <= -B || B <= value)
             {
-                _sign = Math.Sign(value);
                 _dig = new ulong[2];
-                (_dig[1], _dig[0]) = Math.DivRem((ulong)NumericsHelpers.Abs(value), BigIntegerCalculator.Base);
+                (_dig[1], _dig[0]) = Math.DivRem(uv, BigIntegerCalculator.Base);
+            }
+            else if (value < -int.MaxValue || int.MaxValue < value)
+            {
+                _sign = Math.Sign(value);
+                _dig = new ulong[] { uv };
             }
             else
             {
-                _sign = value;
+                _sign = (int)value;
             }
 
             AssertValid();
@@ -87,15 +77,20 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
                 _dig = new ulong[2];
                 (_dig[1], _dig[0]) = Math.DivRem(value, B);
             }
+            else if (int.MaxValue < value)
+            {
+                _sign = 1;
+                _dig = new ulong[] { value };
+            }
             else
             {
-                _sign = (long)value;
+                _sign = (int)value;
             }
 
             AssertValid();
         }
 
-        internal BigIntegerDecimal(long n, ulong[]? rgu)
+        internal BigIntegerDecimal(int n, ulong[]? rgu)
         {
             if ((rgu is not null) && (rgu.Length > MaxLength))
             {
@@ -131,9 +126,9 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             {
                 this = s_bnZeroInt;
             }
-            else if (len == 1 && value[0] < BigIntegerCalculator.Base)
+            else if (len == 1 && value[0] <= int.MaxValue)
             {
-                _sign = negative ? -(long)value[0] : (long)value[0];
+                _sign = negative ? -(int)value[0] : (int)value[0];
                 _dig = null;
             }
             else
@@ -144,96 +139,6 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             AssertValid();
         }
 
-#if false
-        /// <summary>
-        /// Create a BigInteger from a little-endian twos-complement UInt32 span.
-        /// </summary>
-        /// <param name="value"></param>
-        private BigIntegerDecimal(Span<uint> value)
-        {
-            if (value.Length > MaxLength)
-            {
-                ThrowHelper.ThrowOverflowException();
-            }
-
-            int dwordCount = value.Length;
-            bool isNegative = dwordCount > 0 && ((value[dwordCount - 1] & kuMaskHighBit) == kuMaskHighBit);
-
-            // Try to conserve space as much as possible by checking for wasted leading span entries
-            while (dwordCount > 0 && value[dwordCount - 1] == 0) dwordCount--;
-
-            if (dwordCount == 0)
-            {
-                // BigInteger.Zero
-                this = s_bnZeroInt;
-                AssertValid();
-                return;
-            }
-            if (dwordCount == 1)
-            {
-                if (unchecked((int)value[0]) < 0 && !isNegative)
-                {
-                    _dig = new uint[1];
-                    _dig[0] = value[0];
-                    _sign = +1;
-                }
-                // Handle the special cases where the BigInteger likely fits into _sign
-                else if (int.MinValue == unchecked((int)value[0]))
-                {
-                    this = s_bnMinInt;
-                }
-                else
-                {
-                    _sign = unchecked((int)value[0]);
-                    _dig = null;
-                }
-                AssertValid();
-                return;
-            }
-
-            if (!isNegative)
-            {
-                // Handle the simple positive value cases where the input is already in sign magnitude
-                _sign = +1;
-                value = value.Slice(0, dwordCount);
-                _dig = value.ToArray();
-                AssertValid();
-                return;
-            }
-
-            // Finally handle the more complex cases where we must transform the input into sign magnitude
-            NumericsHelpers.DangerousMakeTwosComplement(value); // mutates val
-
-            // Pack _bits to remove any wasted space after the twos complement
-            int len = value.Length;
-            while (len > 0 && value[len - 1] == 0) len--;
-
-            // The number is represented by a single dword
-            if (len == 1 && unchecked((int)(value[0])) > 0)
-            {
-                if (value[0] == 1 /* abs(-1) */)
-                {
-                    this = s_bnMinusOneInt;
-                }
-                else if (value[0] == kuMaskHighBit /* abs(Int32.MinValue) */)
-                {
-                    this = s_bnMinInt;
-                }
-                else
-                {
-                    _sign = (-1) * ((int)value[0]);
-                    _dig = null;
-                }
-            }
-            else
-            {
-                _sign = -1;
-                _dig = value.Slice(0, len).ToArray();
-            }
-            AssertValid();
-            return;
-        }
-#endif
         public static BigIntegerDecimal Zero { get { return s_bnZeroInt; } }
 
         public static BigIntegerDecimal One { get { return s_bnOneInt; } }
@@ -241,29 +146,6 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
         public static BigIntegerDecimal MinusOne { get { return s_bnMinusOneInt; } }
 
         internal static int MaxLength => Array.MaxLength / sizeof(uint);
-
-        public bool IsPowerOfTwo
-        {
-            get
-            {
-                AssertValid();
-
-                if (_dig == null)
-                    return BitOperations.IsPow2(_sign);
-
-                if (_sign != 1)
-                    return false;
-                int iu = _dig.Length - 1;
-                if (!BitOperations.IsPow2(_dig[iu]))
-                    return false;
-                while (--iu >= 0)
-                {
-                    if (_dig[iu] != 0)
-                        return false;
-                }
-                return true;
-            }
-        }
 
         public bool IsZero { get { AssertValid(); return _sign == 0; } }
 
@@ -731,7 +613,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             AssertValid();
 
             if (_dig is null)
-                return _sign.GetHashCode();
+                return _sign;
 
             HashCode hash = default;
             hash.AddBytes(MemoryMarshal.AsBytes(_dig.AsSpan()));
@@ -876,7 +758,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             return true;
         }
 
-        private static BigIntegerDecimal Add(ReadOnlySpan<ulong> leftBits, long leftSign, ReadOnlySpan<ulong> rightBits, long rightSign)
+        private static BigIntegerDecimal Add(ReadOnlySpan<ulong> leftBits, int leftSign, ReadOnlySpan<ulong> rightBits, int rightSign)
         {
             bool trivialLeft = leftBits.IsEmpty;
             bool trivialRight = rightBits.IsEmpty;
@@ -954,7 +836,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             return Subtract(left._dig, left._sign, right._dig, right._sign);
         }
 
-        private static BigIntegerDecimal Subtract(ReadOnlySpan<ulong> leftBits, long leftSign, ReadOnlySpan<ulong> rightBits, long rightSign)
+        private static BigIntegerDecimal Subtract(ReadOnlySpan<ulong> leftBits, int leftSign, ReadOnlySpan<ulong> rightBits, int rightSign)
         {
             bool trivialLeft = leftBits.IsEmpty;
             bool trivialRight = rightBits.IsEmpty;
@@ -1357,12 +1239,12 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             right.AssertValid();
 
             if (left._dig == null && right._dig == null)
-                return (Int128)left._sign * right._sign;
+                return (long)left._sign * right._sign;
 
             return Multiply(left._dig, left._sign, right._dig, right._sign);
         }
 
-        private static BigIntegerDecimal Multiply(ReadOnlySpan<ulong> left, long leftSign, ReadOnlySpan<ulong> right, long rightSign)
+        private static BigIntegerDecimal Multiply(ReadOnlySpan<ulong> left, int leftSign, ReadOnlySpan<ulong> right, int rightSign)
         {
             bool trivialLeft = left.IsEmpty;
             bool trivialRight = right.IsEmpty;
@@ -1724,10 +1606,6 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
                     Debug.Assert(d < B);
                 }
             }
-            else
-            {
-                Debug.Assert(NumericsHelpers.Abs(_sign) < B);
-            }
         }
 
         //
@@ -1810,7 +1688,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
         static int INumber<BigIntegerDecimal>.Sign(BigIntegerDecimal value)
         {
             value.AssertValid();
-            return long.Sign(value._sign);
+            return int.Sign(value._sign);
         }
 
 
@@ -2404,8 +2282,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
                 }
                 else
                 {
-                    actualResult = (value._sign >= int.MaxValue) ? int.MaxValue :
-                                   (value._sign <= int.MinValue) ? int.MinValue : (int)value._sign;
+                    actualResult = value._sign;
                 }
 
                 result = (TOther)(object)actualResult;

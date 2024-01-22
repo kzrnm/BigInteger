@@ -10,6 +10,17 @@ namespace Kzrnm.Numerics.Decimal
     {
         [MethodImpl(256)]
         [DebuggerStepThrough]
+        public static uint Abs(int a)
+        {
+            unchecked
+            {
+                uint mask = (uint)(a >> 31);
+                return ((uint)a ^ mask) - mask;
+            }
+        }
+
+        [MethodImpl(256)]
+        [DebuggerStepThrough]
         public static ulong Abs(long a)
         {
             unchecked
