@@ -61,6 +61,22 @@ namespace Kzrnm.Numerics.Test
         }
 
         [Fact]
+        public void ParseTest()
+        {
+            var rnd = new Random(227);
+            for (int i = 0; i < 50; i++)
+            {
+                var s = "1" + new string('0', i);
+                (MyBigInteger.Parse(s)).Should().Equal(OrigBigInteger.Parse(s));
+            }
+            for (int i = 1; i < 50; i++)
+            {
+                var s = new string('1', i) + new string('0', i);
+                (MyBigInteger.Parse(s)).Should().Equal(OrigBigInteger.Parse(s));
+            }
+        }
+
+        [Fact]
         public void ToStringTest()
         {
             var rnd = new Random(227);

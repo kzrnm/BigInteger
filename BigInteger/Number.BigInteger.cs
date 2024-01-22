@@ -1584,6 +1584,7 @@ namespace Kzrnm.Numerics
             if (value.Length == 0)
                 return false;
 
+            number.Scale = value.Length;
             {
                 int iv = value.Length;
                 while (--iv >= 0 && value[iv] == '0') ;
@@ -1597,13 +1598,12 @@ namespace Kzrnm.Numerics
                     number.HasNonZeroTail = true;
                     value = value[..(iv + 1)];
                 }
-                number.Scale = value.Length - iv - 1;
             }
 
             if (number.Digits.Length < value.Length + 1)
                 return false;
 
-            number.Scale = number.DigitsCount = value.Length;
+            number.DigitsCount = value.Length;
             for (int i = 0; i < value.Length; i++)
             {
                 number.Digits[i] = (byte)value[i];
