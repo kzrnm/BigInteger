@@ -5,6 +5,7 @@ using System;
 using System.Buffers;
 using System.Diagnostics;
 using System.Numerics;
+using System.Text;
 
 namespace Kzrnm.Numerics.Decimal
 {
@@ -196,6 +197,7 @@ namespace Kzrnm.Numerics.Decimal
             static void ToUInt64(ReadOnlySpan<ulong> src, Span<ulong> dst)
             {
                 dst[0] = src[^1];
+                dst[1..].Clear();
                 int len = 1;
                 for (int i = src.Length - 2; i >= 0; i--)
                 {
@@ -246,15 +248,16 @@ namespace Kzrnm.Numerics.Decimal
 
                 while (s.Length > 0)
                 {
-                    UInt128 carry = default;
+                    ulong carry = 0;
                     for (int i = s.Length - 1; i >= 0; i--)
                     {
-                        var value = (carry << 64) | s[i];
+                        var value = new UInt128(carry, s[i]);
                         var digit = value / Base;
+                        Debug.Assert(digit >> 64 == 0);
                         s[i] = (ulong)digit;
-                        carry = value - digit * Base;
+                        carry = (ulong)(value - digit * Base);
                     }
-                    dst[0] = (ulong)carry;
+                    dst[0] = carry;
                     dst = dst[1..];
                     s = s[..ActualLength(s)];
                 }
@@ -311,22 +314,16 @@ namespace Kzrnm.Numerics.Decimal
                 ArrayPool<ulong>.Shared.Return(left64FromPool);
         }
 
-        static void DivideGrammarSchool(Span<ulong> left, ReadOnlySpan<ulong> right, Span<ulong> quotient)
+        private static void DivideGrammarSchool(Span<ulong> left, ReadOnlySpan<ulong> right, Span<ulong> quotient)
         {
-            Debug.Assert(left.Length >= 1);
-            Debug.Assert(right.Length >= 1);
-            Debug.Assert(left.Length >= right.Length);
-            Debug.Assert(
-                quotient.Length == 0
-                || quotient.Length == left.Length - right.Length + 1
-                || (CompareActual(left.Slice(left.Length - right.Length), right) < 0 && quotient.Length == left.Length - right.Length));
+            Debug.Assert(Environment.Is64BitProcess);
 
             // Executes the "grammar-school" algorithm for computing q = a / b.
             // Before calculating q_i, we get more bits into the highest bit
             // block of the divisor. Thus, guessing digits of the quotient
             // will be more precise. Additionally we'll get r = a % b.
 
-            ulong divHi = right[^1];
+            ulong divHi = right[right.Length - 1];
             ulong divLo = right.Length > 1 ? right[right.Length - 2] : 0;
 
             // We measure the leading zeros of the divisor
@@ -347,9 +344,10 @@ namespace Kzrnm.Numerics.Decimal
             for (int i = left.Length; i >= right.Length; i--)
             {
                 int n = i - right.Length;
-                ulong t = (uint)i < (uint)left.Length ? left[i] : 0;
 
-                UInt128 valHi = ((UInt128)t << 64) | left[i - 1];
+                ulong t = (uint)i < (uint)left.Length ? left[i] : 0;
+                ulong valHi = t;
+                ulong valMi = left[i - 1];
                 ulong valLo = i > 1 ? left[i - 2] : 0;
 
                 // We shifted the divisor, we shift the dividend too
@@ -357,18 +355,18 @@ namespace Kzrnm.Numerics.Decimal
                 {
                     ulong valNx = i > 2 ? left[i - 3] : 0;
 
-                    valHi = (valHi << shift) | (valLo >> backShift);
+                    valHi = (valHi << shift) | (valMi >> backShift);
+                    valMi = (valMi << shift) | (valLo >> backShift);
                     valLo = (valLo << shift) | (valNx >> backShift);
                 }
 
                 // First guess for the current digit of the quotient,
-                // which naturally must have only 32 bits...
-                UInt128 digit = valHi / divHi;
-                if ((digit >> 64) > 0)
-                    digit = 0xFFFFFFFFFFFFFFFF;
+                // which naturally must have only 64 bits...
+                UInt128 digit128 = new UInt128(valHi << 64, valMi) / divHi;
+                ulong digit = digit128 > 0xFFFFFFFFFFFFFFFF ? 0xFFFFFFFFFFFFFFFF : (ulong)digit128;
 
                 // Our first guess may be a little bit to big
-                while (DivideGuessTooBig(digit, valHi, valLo, divHi, divLo))
+                while (DivideGuessTooBig(digit, valHi, valMi, valLo, divHi, divLo))
                     --digit;
 
                 if (digit > 0)
@@ -389,56 +387,95 @@ namespace Kzrnm.Numerics.Decimal
 
                 // We have the digit!
                 if ((uint)n < (uint)quotient.Length)
-                    quotient[n] = (ulong)digit;
+                    quotient[n] = digit;
 
                 if ((uint)i < (uint)left.Length)
                     left[i] = 0;
             }
-        }
 
-        static ulong AddDivisor(Span<ulong> left, ReadOnlySpan<ulong> right)
-        {
-            Debug.Assert(left.Length >= right.Length);
-
-            // Repairs the dividend, if the last subtract was too much
-
-            UInt128 carry = 0UL;
-
-            for (int i = 0; i < right.Length; i++)
+            static ulong AddDivisor(Span<ulong> left, ReadOnlySpan<ulong> right)
             {
-                ref ulong leftElement = ref left[i];
-                UInt128 digit = (leftElement + carry) + right[i];
-                leftElement = unchecked((ulong)digit);
-                carry = digit >> 64;
+                Debug.Assert(left.Length >= right.Length);
+
+                // Repairs the dividend, if the last subtract was too much
+
+                ulong carry = 0UL;
+
+                for (int i = 0; i < right.Length; i++)
+                {
+                    ulong hi = 0;
+                    ref ulong leftElement = ref left[i];
+                    leftElement += carry;
+                    if (leftElement < carry)
+                        ++hi;
+                    leftElement += right[i];
+                    if (leftElement < right[i])
+                        ++hi;
+
+                    carry = hi;
+                }
+
+                return carry;
             }
 
-            return (ulong)carry;
-        }
-
-        static ulong SubtractDivisor(Span<ulong> left, ReadOnlySpan<ulong> right, UInt128 q)
-        {
-            Debug.Assert(left.Length >= right.Length);
-            Debug.Assert(q <= 0xFFFFFFFFFFFFFFFF);
-
-            // Combines a subtract and a multiply operation, which is naturally
-            // more efficient than multiplying and then subtracting...
-
-            UInt128 carry = 0UL;
-
-            for (int i = 0; i < right.Length; i++)
+            static ulong SubtractDivisor(Span<ulong> left, ReadOnlySpan<ulong> right, ulong q)
             {
-                carry += right[i] * q;
-                ulong digit = unchecked((ulong)carry);
-                carry >>= 64;
-                ref ulong leftElement = ref left[i];
-                if (leftElement < digit)
-                    ++carry;
-                leftElement -= digit;
+                Debug.Assert(left.Length >= right.Length);
+
+                // Combines a subtract and a multiply operation, which is naturally
+                // more efficient than multiplying and then subtracting...
+
+                ulong carry = 0;
+                ulong carryHi = 0;
+
+                for (int i = 0; i < right.Length; i++)
+                {
+                    ulong hi = Math.BigMul(right[i], q, out ulong digit);
+                    digit += carry;
+                    if (digit < carry)
+                        ++hi;
+                    carry = carryHi + hi;
+                    carryHi = carry < hi ? 1u : 0;
+
+                    ref ulong leftElement = ref left[i];
+                    if (leftElement < digit)
+                    {
+                        if (++carry == 0)
+                            ++carryHi;
+                    }
+                    leftElement -= digit;
+                }
+
+                return carry;
             }
 
-            return (ulong)carry;
-        }
+            static bool DivideGuessTooBig(ulong q, ulong valHi, ulong valMi, ulong valLo, ulong divHi, ulong divLo)
+            {
+                // We multiply the two most significant limbs of the divisor
+                // with the current guess for the quotient. If those are bigger
+                // than the three most significant limbs of the current dividend
+                // we return true, which means the current guess is still too big.
 
+                ulong chkHi = Math.BigMul(divHi, q, out ulong chkMi1);
+                ulong chkMi2 = Math.BigMul(divLo, q, out ulong chkLo);
+
+                ulong chkMi = chkMi1 + chkMi2;
+                if (chkMi < chkMi1)
+                    ++chkHi;
+
+                if (chkHi > valHi)
+                    return true;
+                if (chkHi == valHi)
+                {
+                    if (chkMi > valMi)
+                        return true;
+                    if (chkMi == valMi)
+                        return chkLo > valLo;
+                }
+
+                return false;
+            }
+        }
         static bool DivideGuessTooBig(UInt128 q, UInt128 valHi, ulong valLo,
                                               ulong divHi, ulong divLo)
         {
