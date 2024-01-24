@@ -2,6 +2,7 @@
 {
     public class BigIntegerTests : BigIntegerTestsBase<MyBigInteger>
     {
+
         [Fact]
         public void ToStringTest()
         {
