@@ -5,6 +5,7 @@ using BenchmarkDotNet.Reports;
 using BenchmarkDotNet.Running;
 using BenchmarkDotNet.Toolchains.CoreRun;
 using BenchmarkDotNet.Toolchains.CsProj;
+using Kzrnm.Numerics;
 using System;
 using System.Diagnostics;
 using System.Numerics;
@@ -67,6 +68,9 @@ public class BigIntegerParse
 
     [Benchmark]
     public MyBigInteger New() => MyBigInteger.Parse(s);
+
+    [Benchmark]
+    public BigIntegerNative Native() => BigIntegerNative.Parse(s);
 }
 
 [Config(typeof(BenchmarkConfig))]
@@ -108,6 +112,7 @@ public class BigIntegerAdd
 
     MyBigInteger my1, my2;
     OrigBigInteger orig1, orig2;
+    BigIntegerNative na1, na2;
 
     [GlobalSetup]
     public void Setup()
@@ -117,9 +122,11 @@ public class BigIntegerAdd
         rnd.NextBytes(bytes1);
         rnd.NextBytes(bytes2);
         orig1 = new OrigBigInteger(bytes1, isUnsigned: true);
-        my1 = new MyBigInteger(bytes1, isUnsigned: true);
         orig2 = new OrigBigInteger(bytes2, isUnsigned: true);
+        my1 = new MyBigInteger(bytes1, isUnsigned: true);
         my2 = new MyBigInteger(bytes2, isUnsigned: true);
+        na1 = new BigIntegerNative(bytes1, isUnsigned: true);
+        na2 = new BigIntegerNative(bytes2, isUnsigned: true);
     }
 
     [Benchmark(Baseline = true)]
@@ -127,6 +134,9 @@ public class BigIntegerAdd
 
     [Benchmark]
     public MyBigInteger New() => my1 + my2;
+
+    [Benchmark]
+    public BigIntegerNative Native() => na1 + na2;
 }
 
 [Config(typeof(BenchmarkConfig))]
@@ -140,6 +150,7 @@ public class BigIntegerMultiply
 
     MyBigInteger my1, my2;
     OrigBigInteger orig1, orig2;
+    BigIntegerNative na1, na2;
 
     [GlobalSetup]
     public void Setup()
@@ -149,9 +160,11 @@ public class BigIntegerMultiply
         rnd.NextBytes(bytes1);
         rnd.NextBytes(bytes2);
         orig1 = new OrigBigInteger(bytes1, isUnsigned: true);
-        my1 = new MyBigInteger(bytes1, isUnsigned: true);
         orig2 = new OrigBigInteger(bytes2, isUnsigned: true);
+        my1 = new MyBigInteger(bytes1, isUnsigned: true);
         my2 = new MyBigInteger(bytes2, isUnsigned: true);
+        na1 = new BigIntegerNative(bytes1, isUnsigned: true);
+        na2 = new BigIntegerNative(bytes2, isUnsigned: true);
     }
 
     [Benchmark(Baseline = true)]
@@ -159,6 +172,9 @@ public class BigIntegerMultiply
 
     [Benchmark]
     public MyBigInteger New() => my1 * my2;
+
+    [Benchmark]
+    public BigIntegerNative Native() => na1 * na2;
 }
 
 [Config(typeof(BenchmarkConfig))]
@@ -172,6 +188,7 @@ public class BigIntegerDivide
 
     MyBigInteger my1, my2;
     OrigBigInteger orig1, orig2;
+    BigIntegerNative na1, na2;
 
     [GlobalSetup]
     public void Setup()
@@ -181,9 +198,11 @@ public class BigIntegerDivide
         rnd.NextBytes(bytes1);
         rnd.NextBytes(bytes2);
         orig1 = new OrigBigInteger(bytes1, isUnsigned: true);
-        my1 = new MyBigInteger(bytes1, isUnsigned: true);
         orig2 = new OrigBigInteger(bytes2, isUnsigned: true);
+        my1 = new MyBigInteger(bytes1, isUnsigned: true);
         my2 = new MyBigInteger(bytes2, isUnsigned: true);
+        na1 = new BigIntegerNative(bytes1, isUnsigned: true);
+        na2 = new BigIntegerNative(bytes2, isUnsigned: true);
     }
 
     [Benchmark(Baseline = true)]
@@ -191,4 +210,7 @@ public class BigIntegerDivide
 
     [Benchmark]
     public MyBigInteger New() => my1 / my2;
+
+    [Benchmark]
+    public BigIntegerNative Native() => na1 / na2;
 }
