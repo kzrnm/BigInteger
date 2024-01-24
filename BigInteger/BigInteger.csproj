@@ -7,4 +7,7 @@
 		<RootNamespace>Kzrnm.Numerics</RootNamespace>
 	</PropertyGroup>
 
+	<ItemGroup>
+		<InternalsVisibleTo Include="BigInteger.Test"/>
+	</ItemGroup>
 </Project>
