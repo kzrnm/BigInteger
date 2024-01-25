@@ -5,9 +5,35 @@
 		<ImplicitUsings>disable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 		<RootNamespace>Kzrnm.Numerics</RootNamespace>
+
+		<Version>0.1.0</Version>
+		<AssemblyVersion>0.1.0.101</AssemblyVersion>
+
+		<PackageTags>BigInteger</PackageTags>
+		<PackageId>Kzrnm.BigInteger</PackageId>
+		<Description>Faster port of BigInteger</Description>
+
+		<Authors>kzrnm</Authors>
+		<RepositoryType>git</RepositoryType>
+		<PackageProjectUrl>https://github.com/kzrnm/BigInteger</PackageProjectUrl>
+		<RepositoryUrl>https://github.com/kzrnm/BigInteger</RepositoryUrl>
+
+		<RepositoryCommit Condition="'$(GIT_COMMIT)' != ''">$(GIT_COMMIT)</RepositoryCommit>
+
+		<EmbedUntrackedSources>true</EmbedUntrackedSources>
+		<IncludeSymbols>true</IncludeSymbols>
+		<SymbolPackageFormat>snupkg</SymbolPackageFormat>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(GITHUB_ACTIONS)' == 'true'">
+		<ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
 	</PropertyGroup>
 
 	<ItemGroup>
-		<InternalsVisibleTo Include="BigInteger.Test"/>
+		<InternalsVisibleTo Include="BigInteger.Test" />
+		<PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0">
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
 	</ItemGroup>
 </Project>
