@@ -846,7 +846,7 @@ namespace Kzrnm.Numerics.Experiment
 
             try
             {
-                if (number.DigitsCount <= s_naiveThreshold)
+                if (number.Scale <= s_naiveThreshold)
                 {
                     return Naive(ref number, out result);
                 }

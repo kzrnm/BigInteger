@@ -447,8 +447,7 @@ namespace Kzrnm.Numerics.Experiment
 
                 // First guess for the current digit of the quotient,
                 // which naturally must have only 64 bits...
-                UInt128 digit128 = new UInt128(valHi, valMi) / divHi;
-                ulong digit = digit128 > 0xFFFFFFFFFFFFFFFF ? 0xFFFFFFFFFFFFFFFF : (ulong)digit128;
+                ulong digit = valHi >= divHi ? 0xFFFFFFFFFFFFFFFF : DivRem64(valHi, valMi, divHi, out _);
 
                 // Our first guess may be a little bit to big
                 while (DivideGuessTooBig(digit, valHi, valMi, valLo, divHi, divLo))
