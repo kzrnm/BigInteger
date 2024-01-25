@@ -5,7 +5,6 @@ using System;
 using System.Buffers;
 using System.Diagnostics;
 using System.Numerics;
-using System.Text;
 
 namespace Kzrnm.Numerics.Decimal
 {
@@ -22,7 +21,7 @@ namespace Kzrnm.Numerics.Decimal
         public static void Divide(ReadOnlySpan<ulong> left, ulong right, Span<ulong> quotient, out ulong remainder)
         {
             DummyForDebug(quotient);
-            UInt128 carry = default;
+            var carry = 0ul;
             DivideImpl(left, right, quotient, ref carry);
             remainder = (ulong)carry;
         }
@@ -30,11 +29,11 @@ namespace Kzrnm.Numerics.Decimal
         public static void Divide(ReadOnlySpan<ulong> left, ulong right, Span<ulong> quotient)
         {
             DummyForDebug(quotient);
-            UInt128 carry = default;
+            var carry = 0ul;
             DivideImpl(left, right, quotient, ref carry);
         }
 
-        static void DivideImpl(ReadOnlySpan<ulong> left, ulong right, Span<ulong> quotient, ref UInt128 carry)
+        static void DivideImpl(ReadOnlySpan<ulong> left, ulong right, Span<ulong> quotient, ref ulong carry)
         {
             Debug.Assert(left.Length >= 1);
             Debug.Assert(quotient.Length == left.Length);
@@ -46,8 +45,7 @@ namespace Kzrnm.Numerics.Decimal
 
             for (int i = left.Length - 1; i >= 0; i--)
             {
-                (var quo, carry) = UInt128.DivRem(carry * Base + left[i], right);
-                quotient[i] = (ulong)quo;
+                quotient[i] = DivRem(carry, left[i], right, out carry);
             }
         }
 
@@ -59,7 +57,7 @@ namespace Kzrnm.Numerics.Decimal
             ulong carry = 0UL;
             for (int i = left.Length - 1; i >= 0; i--)
             {
-                carry = (ulong)(((UInt128)carry * Base + left[i]) % right);
+                DivRem(carry, left[i], right, out carry);
             }
 
             return carry;
@@ -362,7 +360,7 @@ namespace Kzrnm.Numerics.Decimal
 
                 // First guess for the current digit of the quotient,
                 // which naturally must have only 64 bits...
-                UInt128 digit128 = new UInt128(valHi << 64, valMi) / divHi;
+                UInt128 digit128 = new UInt128(valHi, valMi) / divHi;
                 ulong digit = digit128 > 0xFFFFFFFFFFFFFFFF ? 0xFFFFFFFFFFFFFFFF : (ulong)digit128;
 
                 // Our first guess may be a little bit to big
@@ -475,24 +473,6 @@ namespace Kzrnm.Numerics.Decimal
 
                 return false;
             }
-        }
-        static bool DivideGuessTooBig(UInt128 q, UInt128 valHi, ulong valLo,
-                                              ulong divHi, ulong divLo)
-        {
-            Debug.Assert(q <= 0xFFFFFFFFFFFFFFFF);
-
-            // We multiply the two most significant limbs of the divisor
-            // with the current guess for the quotient. If those are bigger
-            // than the three most significant limbs of the current dividend
-            // we return true, which means the current guess is still too big.
-
-            UInt128 chkHi = divHi * q;
-            UInt128 chkLo = divLo * q;
-
-            chkHi += (chkLo >> 64);
-            ulong chkLoUInt64 = (ulong)(chkLo);
-
-            return (chkHi > valHi) || ((chkHi == valHi) && (chkLoUInt64 > valLo));
         }
         static void DivideBurnikelZiegler(ReadOnlySpan<ulong> left, ReadOnlySpan<ulong> right, Span<ulong> quotient, Span<ulong> remainder)
         {
@@ -674,7 +654,7 @@ namespace Kzrnm.Numerics.Decimal
             }
             else if (right.Length == 1)
             {
-                UInt128 carry;
+                ulong carry;
 
                 if (quotient.Length < left.Length)
                 {
@@ -694,7 +674,7 @@ namespace Kzrnm.Numerics.Decimal
                 if (remainder.Length != 0)
                 {
                     remainder.Slice(1).Clear();
-                    remainder[0] = (ulong)carry;
+                    remainder[0] = carry;
                 }
             }
             else
@@ -768,6 +748,7 @@ namespace Kzrnm.Numerics.Decimal
                                 stackalloc ulong[StackAllocThreshold]
                                 : bbFromPool = ArrayPool<ulong>.Shared.Rent(left12.Length)).Slice(0, left12.Length);
                 b1.CopyTo(bb.Slice(halfN));
+                r1.Clear();
 
                 SubtractSelf(bb, b1);
                 SubtractSelf(r1, bb);

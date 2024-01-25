@@ -75,6 +75,63 @@ namespace Kzrnm.Numerics.Test
 #endif
 
         [Fact]
+        public void RandomDivRem()
+        {
+            var rnd = new Random(227);
+            {
+                var bytes1 = new byte[BigIntegerCalculator.DivideThreshold * sizeof(uint) / sizeof(byte) * 4];
+                var bytes2 = new byte[BigIntegerCalculator.DivideThreshold * sizeof(uint) / sizeof(byte) * 2];
+
+                bytes1.AsSpan().Fill(255);
+                bytes2[^1] = 0x80;
+
+                var (quo, rem) = OrigBigInteger.DivRem(new(bytes1, isUnsigned: true), new(bytes2, isUnsigned: true));
+                var (quo2, rem2) = MyBigInteger.DivRem(new(bytes1, isUnsigned: true), new(bytes2, isUnsigned: true));
+                Equal(quo2, quo);
+                Equal(rem2, rem);
+            }
+            for (int i = 0; i < 100; i++)
+            {
+                var bytes1 = new byte[BigIntegerCalculator.DivideThreshold * sizeof(uint) / sizeof(byte) * 4];
+                var bytes2 = new byte[BigIntegerCalculator.DivideThreshold * sizeof(uint) / sizeof(byte) * 2];
+
+                rnd.NextBytes(bytes1);
+                bytes2[^1] = 0x80;
+
+                var (quo, rem) = OrigBigInteger.DivRem(new(bytes1, isUnsigned: true), new(bytes2, isUnsigned: true));
+                var (quo2, rem2) = MyBigInteger.DivRem(new(bytes1, isUnsigned: true), new(bytes2, isUnsigned: true));
+                Equal(quo2, quo);
+                Equal(rem2, rem);
+            }
+            for (int i = 0; i < 100; i++)
+            {
+                var bytes1 = new byte[BigIntegerCalculator.DivideThreshold * sizeof(uint) / sizeof(byte) * 4];
+                var bytes2 = new byte[BigIntegerCalculator.DivideThreshold * sizeof(uint) / sizeof(byte) * 2];
+
+                rnd.NextBytes(bytes1);
+                rnd.NextBytes(bytes2);
+
+                var (quo, rem) = OrigBigInteger.DivRem(new(bytes1, isUnsigned: true), new(bytes2, isUnsigned: true));
+                var (quo2, rem2) = MyBigInteger.DivRem(new(bytes1, isUnsigned: true), new(bytes2, isUnsigned: true));
+                Equal(quo2, quo);
+                Equal(rem2, rem);
+            }
+            for (int i = 0; i < 100; i++)
+            {
+                var bytes1 = new byte[rnd.Next(700, 1200)];
+                var bytes2 = new byte[rnd.Next(400, bytes1.Length * 2 / 3)];
+
+                rnd.NextBytes(bytes1);
+                rnd.NextBytes(bytes2);
+
+                var (quo, rem) = OrigBigInteger.DivRem(new(bytes1, isUnsigned: true), new(bytes2, isUnsigned: true));
+                var (quo2, rem2) = MyBigInteger.DivRem(new(bytes1, isUnsigned: true), new(bytes2, isUnsigned: true));
+                Equal(quo2, quo);
+                Equal(rem2, rem);
+            }
+        }
+
+        [Fact]
         public void ToStringTest()
         {
             var rnd = new Random(227);

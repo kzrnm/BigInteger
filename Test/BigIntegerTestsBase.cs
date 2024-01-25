@@ -2,6 +2,9 @@
 using System.Diagnostics;
 using System.Numerics;
 using System.Reflection;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace Kzrnm.Numerics.Test
 {
@@ -122,6 +125,7 @@ namespace Kzrnm.Numerics.Test
         [Fact]
         public void DivRem()
         {
+            var divRemMethod = typeof(T).GetMethod("DivRem", BindingFlags.Public | BindingFlags.Static, [typeof(T), typeof(T)]);
             foreach (var data in Values().Concat(DivValues()))
             {
                 var (quo, rem) = OrigBigInteger.DivRem(data.OrigLeft, data.OrigRight);
@@ -131,7 +135,7 @@ namespace Kzrnm.Numerics.Test
                 Equal((ss / tt), quo);
                 Equal((ss % tt), rem);
 
-                var (quo2, rem2) = ((T, T))typeof(T).GetMethod("DivRem", BindingFlags.Public | BindingFlags.Static, [typeof(T), typeof(T)])?.Invoke(null, [ss, tt])!;
+                var (quo2, rem2) = ((T, T))divRemMethod?.Invoke(null, [ss, tt])!;
                 Equal(quo2, quo);
                 Equal(rem2, rem);
             }

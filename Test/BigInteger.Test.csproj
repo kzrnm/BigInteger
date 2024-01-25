@@ -8,7 +8,7 @@
 
 		<IsPackable>false</IsPackable>
 		<IsTestProject>true</IsTestProject>
-		<RootNamespace>Kzrnm.Numerics.Test</RootNamespace>
+		<RootNamespace>Kzrnm.Numerics</RootNamespace>
 	</PropertyGroup>
 
 	<ItemGroup>

@@ -57,13 +57,13 @@ namespace Kzrnm.Numerics.Decimal
                     {
                         ref var elementPtr = ref Unsafe.Add(ref resultPtr, i + j);
 
-                        var hi1 = SaveAdd(ref elementPtr, carry);
+                        var hi1 = SafeAdd(ref elementPtr, carry);
                         var hi2 = BigMul(value[j], v, out var lo2);
 
                         hi2 <<= 1;
-                        hi2 += SaveAdd(ref lo2, lo2);
+                        hi2 += SafeAdd(ref lo2, lo2);
 
-                        carry = hi1 + hi2 + SaveAdd(ref elementPtr, lo2);
+                        carry = hi1 + hi2 + SafeAdd(ref elementPtr, lo2);
                     }
                     {
                         Unsafe.Add(ref resultPtr, i + i + 1) = BigMulAdd(v, v, carry, out var lo);
@@ -513,7 +513,7 @@ namespace Kzrnm.Numerics.Decimal
                 {
                     ref ulong elementPtr = ref Unsafe.Add(ref resultPtr, i + j);
                     carry = BigMulAdd(left[j], right[i], carry, out var lo);
-                    carry += SaveAdd(ref elementPtr, lo);
+                    carry += SafeAdd(ref elementPtr, lo);
                 }
                 {
                     carry = DivRemBase(carry, out var rem);

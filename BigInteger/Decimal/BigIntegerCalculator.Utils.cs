@@ -3,6 +3,7 @@
 
 using System;
 using System.Diagnostics;
+using System.Numerics;
 using System.Runtime.CompilerServices;
 
 namespace Kzrnm.Numerics.Decimal
@@ -12,6 +13,28 @@ namespace Kzrnm.Numerics.Decimal
         internal const ulong Base = 1_000_000_000_000_000_000;
         internal const ulong BaseSqrt = 1_000_000_000;
         internal const int BaseLog = 18;
+        static readonly ulong[] UInt64PowersOfTen = new ulong[]
+        {
+            1,
+            10,
+            100,
+            1000,
+            10000,
+            100000,
+            1000000,
+            10000000,
+            100000000,
+            1000000000,
+            10000000000,
+            100000000000,
+            1000000000000,
+            10000000000000,
+            100000000000000,
+            1000000000000000,
+            10000000000000000,
+            100000000000000000,
+            1000000000000000000,
+       };
 
 #if DEBUG
         // Mutable for unit testing...
@@ -111,6 +134,72 @@ namespace Kzrnm.Numerics.Decimal
             return q;
         }
 
+        [MethodImpl(256)]
+        public static ulong DivRem(ulong hi, ulong lo, ulong d, out ulong remainder)
+        {
+            Debug.Assert(hi < d);
+            ulong q;
+            if (hi == 0)
+            {
+                (q, remainder) = Math.DivRem(lo, d);
+                return q;
+            }
+            {
+                // To 64 bits
+                hi = Math.BigMul(hi, Base, out var hilo2);
+                lo += hilo2;
+                if (lo < hilo2)
+                    ++hi;
+
+                if (hi == 0)
+                {
+                    (q, remainder) = Math.DivRem(lo, d);
+                    return q;
+                }
+            }
+
+            int shift = BitOperations.LeadingZeroCount(d);
+            int backShift = 64 - shift;
+            d <<= shift;
+            hi = (hi << shift) | (lo >> backShift);
+            lo <<= shift;
+
+            var lohi = lo >> 32;
+            var lolo = (uint)lo;
+
+            q = D3n2n(hi, lohi, d, out ulong r1) << 32;
+            q |= D3n2n(r1, lolo, d, out remainder);
+            remainder >>= shift;
+            return q;
+
+            [MethodImpl(256)]
+            static ulong D3n2n(ulong a12, ulong a3, ulong b, out ulong rem)
+            {
+                Debug.Assert((a12 >> 32) < b);
+                var b1 = b >> 32;
+                var b2 = (uint)b;
+                ulong quo;
+                (quo, rem) = Math.DivRem(a12, b1);
+                var d = quo * b2;
+
+                var hi = 0ul;
+                rem <<= 32;
+
+                rem += a3;
+                if (rem < a3) ++hi;
+                if (rem < d) --hi;
+                rem -= d;
+                while (hi != 0)
+                {
+                    --quo;
+                    rem += b;
+                    if (rem < b) ++hi;
+                }
+
+                return quo;
+            }
+        }
+
         /// <summary>
         /// [Return, <paramref name="low"/>] <paramref name="a"/> * <paramref name="b"/>
         /// </summary>
@@ -144,13 +233,13 @@ namespace Kzrnm.Numerics.Decimal
         public static ulong BigMulAdd(ulong a, ulong b, ulong c, out ulong low)
         {
             var upper = BigMul(a, b, out low);
-            upper += SaveAdd(ref low, c);
+            upper += SafeAdd(ref low, c);
             return upper;
         }
 
         /// <returns>(a+b)%Base</returns>
         [MethodImpl(256)]
-        public static uint SaveAdd(ref ulong a, ulong b)
+        public static uint SafeAdd(ref ulong a, ulong b)
         {
             a += b;
             if (a >= Base)

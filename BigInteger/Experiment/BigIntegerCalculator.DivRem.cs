@@ -447,7 +447,7 @@ namespace Kzrnm.Numerics.Experiment
 
                 // First guess for the current digit of the quotient,
                 // which naturally must have only 64 bits...
-                UInt128 digit128 = new UInt128(valHi << 64, valMi) / divHi;
+                UInt128 digit128 = new UInt128(valHi, valMi) / divHi;
                 ulong digit = digit128 > 0xFFFFFFFFFFFFFFFF ? 0xFFFFFFFFFFFFFFFF : (ulong)digit128;
 
                 // Our first guess may be a little bit to big
@@ -837,6 +837,7 @@ namespace Kzrnm.Numerics.Experiment
                                 stackalloc nuint[StackAllocThreshold]
                                 : bbFromPool = ArrayPool<nuint>.Shared.Rent(left12.Length)).Slice(0, left12.Length);
                 b1.CopyTo(bb.Slice(halfN));
+                r1.Clear();
 
                 SubtractSelf(bb, b1);
                 SubtractSelf(r1, bb);
