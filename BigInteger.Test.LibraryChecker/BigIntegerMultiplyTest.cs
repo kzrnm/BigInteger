@@ -1,5 +1,4 @@
 ﻿using Kzrnm.Competitive.IO;
-using Kzrnm.Numerics.Experiment;
 using System.Numerics;
 
 namespace Kzrnm.Numerics.Test
@@ -19,7 +18,4 @@ namespace Kzrnm.Numerics.Test
             }
         }
     }
-    internal class MyBigIntegerMultiplyTest : BigIntegerMultiplyTest<BigInteger> { }
-    internal class BigIntegerDecimalMultiplyTest : BigIntegerMultiplyTest<BigIntegerDecimal> { }
-    internal class BigIntegerNativeMultiplyTest : BigIntegerMultiplyTest<BigIntegerNative> { }
 }
