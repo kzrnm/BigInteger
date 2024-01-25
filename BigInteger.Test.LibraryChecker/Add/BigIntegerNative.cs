@@ -1,4 +1,6 @@
-﻿namespace Kzrnm.Numerics.Test.Add
+﻿using Kzrnm.Numerics.Experiment;
+
+namespace Kzrnm.Numerics.Test.Add
 {
-    internal class BigIntegerDecimalAddTest : BigIntegerAddTest<BigIntegerDecimal> { }
+    internal class BigIntegerNativeAddTest : BigIntegerAddTest<BigIntegerNative> { }
 }

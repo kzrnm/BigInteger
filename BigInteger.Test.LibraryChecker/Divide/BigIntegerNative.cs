@@ -1,4 +1,6 @@
-﻿namespace Kzrnm.Numerics.Test.Divide
+﻿using Kzrnm.Numerics.Experiment;
+
+namespace Kzrnm.Numerics.Test.Divide
 {
-    internal class BigIntegerDecimalDivideTest : BigIntegerDivideTest<BigIntegerDecimal> { }
+    internal class BigIntegerNativeDivideTest : BigIntegerDivideTest<BigIntegerNative> { }
 }

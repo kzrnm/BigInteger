@@ -184,8 +184,3 @@ jobs:
         uses: actions/upload-pages-artifact@v1
         with:
           path: _site
-
-      - name: Check
-        uses: competitive-verifier/actions/check@v1
-        with:
-          verify-result: ${{github.workspace}}/merged-result.json

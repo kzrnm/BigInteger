@@ -1,4 +1,6 @@
-﻿namespace Kzrnm.Numerics.Test.Multiply
+﻿using Kzrnm.Numerics.Experiment;
+
+namespace Kzrnm.Numerics.Test.Multiply
 {
-    internal class BigIntegerDecimalMultiplyTest : BigIntegerMultiplyTest<BigIntegerDecimal> { }
+    internal class BigIntegerNativeMultiplyTest : BigIntegerMultiplyTest<BigIntegerNative> { }
 }
