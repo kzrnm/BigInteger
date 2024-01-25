@@ -51,19 +51,23 @@ namespace Kzrnm.Numerics.Decimal
                 // operation and do some extra shifts.
                 for (int i = 0; i < value.Length; i++)
                 {
-                    UInt128 carry = default;
+                    ulong carry = 0;
                     ulong v = value[i];
                     for (int j = 0; j < i; j++)
                     {
-                        var digit1 = Unsafe.Add(ref resultPtr, i + j) + carry;
-                        var digit2 = (UInt128)value[j] * v;
-                        carry = DivRemBase(digit1 + (digit2 << 1), out var rem);
-                        Unsafe.Add(ref resultPtr, i + j) = rem;
+                        ref var elementPtr = ref Unsafe.Add(ref resultPtr, i + j);
+
+                        var hi1 = SaveAdd(ref elementPtr, carry);
+                        var hi2 = BigMul(value[j], v, out var lo2);
+
+                        hi2 <<= 1;
+                        hi2 += SaveAdd(ref lo2, lo2);
+
+                        carry = hi1 + hi2 + SaveAdd(ref elementPtr, lo2);
                     }
                     {
-                        var digits = (UInt128)v * v + carry;
-                        Unsafe.Add(ref resultPtr, i + i + 1) = (ulong)DivRemBase(digits, out var rem);
-                        Unsafe.Add(ref resultPtr, i + i) = rem;
+                        Unsafe.Add(ref resultPtr, i + i + 1) = BigMulAdd(v, v, carry, out var lo);
+                        Unsafe.Add(ref resultPtr, i + i) = lo;
                     }
                 }
             }
@@ -145,7 +149,7 @@ namespace Kzrnm.Numerics.Decimal
 
             for (; i < left.Length; i++)
             {
-                carry = (ulong)DivRemBase((UInt128)left[i] * right + carry, out bits[i]);
+                carry = BigMulAdd(left[i], right, carry, out bits[i]);
             }
             bits[i] = carry;
         }
@@ -191,33 +195,7 @@ namespace Kzrnm.Numerics.Decimal
 
             if (right.Length < MultiplyThreshold)
             {
-                // Switching to managed references helps eliminating
-                // index bounds check...
-                ref ulong resultPtr = ref MemoryMarshal.GetReference(bits);
-
-                // Multiplies the bits using the "grammar-school" method.
-                // Envisioning the "rhombus" of a pen-and-paper calculation
-                // should help getting the idea of these two loops...
-                // The inner multiplication operations are safe, because
-                // z_i+j + a_j * b_i + c <= 2(2^32 - 1) + (2^32 - 1)^2 =
-                // = 2^64 - 1 (which perfectly matches with ulong!).
-
-                for (int i = 0; i < right.Length; i++)
-                {
-                    UInt128 carry = default;
-                    for (int j = 0; j < left.Length; j++)
-                    {
-                        ref ulong elementPtr = ref Unsafe.Add(ref resultPtr, i + j);
-                        var digits = elementPtr + carry + (UInt128)left[j] * right[i];
-                        carry = DivRemBase(digits, out var rem);
-                        elementPtr = rem;
-                    }
-                    {
-                        carry = DivRemBase(carry, out var rem);
-                        Unsafe.Add(ref resultPtr, i + left.Length) = rem;
-                        Debug.Assert(carry == 0);
-                    }
-                }
+                MultiplyNaive(left, right, bits);
             }
             else
             {
@@ -391,33 +369,7 @@ namespace Kzrnm.Numerics.Decimal
 
             if (right.Length < MultiplyThreshold)
             {
-                // Switching to managed references helps eliminating
-                // index bounds check...
-                ref ulong resultPtr = ref MemoryMarshal.GetReference(bits);
-
-                // Multiplies the bits using the "grammar-school" method.
-                // Envisioning the "rhombus" of a pen-and-paper calculation
-                // should help getting the idea of these two loops...
-                // The inner multiplication operations are safe, because
-                // z_i+j + a_j * b_i + c <= 2(2^32 - 1) + (2^32 - 1)^2 =
-                // = 2^64 - 1 (which perfectly matches with ulong!).
-
-                for (int i = 0; i < right.Length; i++)
-                {
-                    UInt128 carry = default;
-                    for (int j = 0; j < left.Length; j++)
-                    {
-                        ref ulong elementPtr = ref Unsafe.Add(ref resultPtr, i + j);
-                        var digits = elementPtr + carry + (UInt128)left[j] * right[i];
-                        carry = DivRemBase(digits, out var rem);
-                        elementPtr = rem;
-                    }
-                    {
-                        carry = DivRemBase(carry, out var rem);
-                        Unsafe.Add(ref resultPtr, i + left.Length) = rem;
-                        Debug.Assert(carry == 0);
-                    }
-                }
+                MultiplyNaive(left, right, bits);
             }
             else
             {
@@ -539,6 +491,35 @@ namespace Kzrnm.Numerics.Decimal
                 long digit = (long)core[i] + carry;
                 carry = DivRemBase(digit, out var rem);
                 core[i] = rem;
+            }
+        }
+        static void MultiplyNaive(ReadOnlySpan<ulong> left, ReadOnlySpan<ulong> right, Span<ulong> bits)
+        {
+            // Switching to managed references helps eliminating
+            // index bounds check...
+            ref ulong resultPtr = ref MemoryMarshal.GetReference(bits);
+
+            // Multiplies the bits using the "grammar-school" method.
+            // Envisioning the "rhombus" of a pen-and-paper calculation
+            // should help getting the idea of these two loops...
+            // The inner multiplication operations are safe, because
+            // z_i+j + a_j * b_i + c <= 2(2^32 - 1) + (2^32 - 1)^2 =
+            // = 2^64 - 1 (which perfectly matches with ulong!).
+
+            for (int i = 0; i < right.Length; i++)
+            {
+                ulong carry = 0;
+                for (int j = 0; j < left.Length; j++)
+                {
+                    ref ulong elementPtr = ref Unsafe.Add(ref resultPtr, i + j);
+                    carry = BigMulAdd(left[j], right[i], carry, out var lo);
+                    carry += SaveAdd(ref elementPtr, lo);
+                }
+                {
+                    carry = DivRemBase(carry, out var rem);
+                    Unsafe.Add(ref resultPtr, i + left.Length) = rem;
+                    Debug.Assert(carry == 0);
+                }
             }
         }
     }

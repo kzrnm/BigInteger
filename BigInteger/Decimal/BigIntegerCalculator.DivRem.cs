@@ -519,7 +519,6 @@ namespace Kzrnm.Numerics.Decimal
 
             int sigmaDigit = n - right.Length;
             ulong mul = Base / (right[^1] + 1);
-            UInt128 mul128 = mul;
 
             ulong[]? bFromPool = null;
 
@@ -542,7 +541,7 @@ namespace Kzrnm.Numerics.Decimal
                             : aFromPool = ArrayPool<ulong>.Shared.Rent(aLength)).Slice(0, aLength);
 
             // 4. normalize
-            static void Normalize(ReadOnlySpan<ulong> src, int sigmaDigit, UInt128 mul, Span<ulong> bits)
+            static void Normalize(ReadOnlySpan<ulong> src, int sigmaDigit, ulong mul, Span<ulong> bits)
             {
                 Debug.Assert(mul < Base);
                 Debug.Assert(src.Length + sigmaDigit <= bits.Length);
@@ -558,15 +557,14 @@ namespace Kzrnm.Numerics.Decimal
                     ulong carry = 0UL;
                     for (int i = 0; i < bits.Length; i++)
                     {
-                        carry = (ulong)DivRemBase((UInt128)bits[i] * mul + carry, out var rem);
-                        bits[i] = rem;
+                        carry = BigMulAdd(bits[i], mul, carry, out bits[i]);
                     }
                     Debug.Assert(carry == 0);
                 }
             }
 
-            Normalize(left, sigmaDigit, mul128, a);
-            Normalize(right, sigmaDigit, mul128, b);
+            Normalize(left, sigmaDigit, mul, a);
+            Normalize(right, sigmaDigit, mul, b);
 
 
             int t = Math.Max(2, (a.Length + n - 1) / n); // Max(2, Ceil(a.Length/n))
@@ -638,6 +636,7 @@ namespace Kzrnm.Numerics.Decimal
 
                 if (mul != 1)
                 {
+                    UInt128 mul128 = mul;
                     UInt128 carry = 0;
                     for (int i = rt.Length - 1; i >= 0; i--)
                     {

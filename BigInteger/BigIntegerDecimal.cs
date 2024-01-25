@@ -1188,15 +1188,15 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
         {
             UInt128 B = BigIntegerCalculator.Base;
 
-            value = BigIntegerCalculator.DivRemBase(value, out var rem0);
-            value = BigIntegerCalculator.DivRemBase(value, out var rem1);
+            (value, var rem0) = UInt128.DivRem(value, B);
+            (value, var rem1) = UInt128.DivRem(value, B);
             ulong rem2 = (ulong)value;
 
             if (rem2 != 0)
-                return new BigIntegerDecimal(stackalloc ulong[3] { rem0, rem1, rem2 }, false);
+                return new BigIntegerDecimal(stackalloc ulong[3] { (ulong)rem0, (ulong)rem1, rem2 }, false);
             if (rem1 != 0)
-                return new BigIntegerDecimal(stackalloc ulong[2] { rem0, rem1 }, false);
-            return new BigIntegerDecimal(rem0);
+                return new BigIntegerDecimal(stackalloc ulong[2] { (ulong)rem0, (ulong)rem1 }, false);
+            return new BigIntegerDecimal((ulong)rem0);
         }
 
         public static BigIntegerDecimal operator -(BigIntegerDecimal value)

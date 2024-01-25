@@ -4,13 +4,13 @@
 using System;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 
 namespace Kzrnm.Numerics.Decimal
 {
     internal static partial class BigIntegerCalculator
     {
         internal const ulong Base = 1_000_000_000_000_000_000;
+        internal const ulong BaseSqrt = 1_000_000_000;
         internal const int BaseLog = 18;
 
 #if DEBUG
@@ -97,13 +97,6 @@ namespace Kzrnm.Numerics.Decimal
             return q;
         }
         [MethodImpl(256)]
-        public static UInt128 DivRemBase(UInt128 v, out ulong remainder)
-        {
-            var q = v / Base;
-            remainder = (ulong)(v - q * Base);
-            return (ulong)q;
-        }
-        [MethodImpl(256)]
         public static long DivRemBase(long v, out ulong remainder)
         {
             const long B = (long)Base;
@@ -116,6 +109,56 @@ namespace Kzrnm.Numerics.Decimal
             }
             remainder = (ulong)rem;
             return q;
+        }
+
+        /// <summary>
+        /// [Return, <paramref name="low"/>] <paramref name="a"/> * <paramref name="b"/>
+        /// </summary>
+        [MethodImpl(256)]
+        public static ulong BigMul(ulong a, ulong b, out ulong low)
+        {
+            Debug.Assert(a < Base);
+            Debug.Assert(b < Base);
+            var (aHi, aLo) = Math.DivRem(a, BaseSqrt);
+            var (bHi, bLo) = Math.DivRem(b, BaseSqrt);
+
+            var hi = aHi * bHi;
+            low = aLo * bLo;
+
+            var mi = aLo * bHi + aHi * bLo;
+
+            var (mh, ml) = Math.DivRem(mi, BaseSqrt);
+            low += ml * BaseSqrt;
+            if (low >= Base)
+            {
+                low -= Base;
+                ++hi;
+            }
+            return hi + mh;
+        }
+
+        /// <summary>
+        /// [Return, <paramref name="low"/>] <paramref name="a"/> * <paramref name="b"/> + <paramref name="c"/>
+        /// </summary>
+        [MethodImpl(256)]
+        public static ulong BigMulAdd(ulong a, ulong b, ulong c, out ulong low)
+        {
+            var upper = BigMul(a, b, out low);
+            upper += SaveAdd(ref low, c);
+            return upper;
+        }
+
+        /// <returns>(a+b)%Base</returns>
+        [MethodImpl(256)]
+        public static uint SaveAdd(ref ulong a, ulong b)
+        {
+            a += b;
+            if (a >= Base)
+            {
+                a -= Base;
+                return 1;
+            }
+            return 0;
         }
     }
 }
