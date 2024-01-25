@@ -85,7 +85,6 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     needs: [build-resolve]
-    continue-on-error: true
     env:
       SPLIT_SIZE: 12
     strategy:
@@ -117,6 +116,13 @@ jobs:
           name: binary-${{github.sha}}
           path: BigInteger.Test.LibraryChecker/bin/Release
 
+      - name: Warm up checker
+        run: |
+          for checker in $(ls BigInteger.Test.LibraryChecker/bin/Release/*/BigInteger.Test.LibraryChecker.dll); do
+            echo "Warm up $checker"
+            dotnet $checker
+          done
+
       - name: Verify
         uses: competitive-verifier/actions/verify@v1
         with:
@@ -124,4 +130,62 @@ jobs:
           split-size: ${{ env.SPLIT_SIZE }}
           split-index: ${{ matrix.index }}
           write-summary: true
-          check: true
+          timeout: 1200
+      - name: Upload result artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: Result-${{ runner.os }}-${{ matrix.index }}
+          path: ${{runner.temp}}/result.json
+          retention-days: 1
+
+  docs-and-check:
+    runs-on: ubuntu-latest
+    needs: [verify]
+    outputs:
+      upload-pages: ${{steps.upload-pages.outcome == 'success'}}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 123456789
+
+      - name: Download verify_files.json and all artifacts
+        id: all-artifacts
+        uses: competitive-verifier/actions/download-verify-artifact@v1
+        with:
+          download-all: true
+          artifact-root: .artifacts/
+
+      - name: Set up competitive-verifier
+        uses: competitive-verifier/actions/setup@v1
+        with:
+          cache-pip: true
+
+      - name: Merge results
+        uses: competitive-verifier/actions/merge-result@v1
+        with:
+          working-directory: Library/.competitive-verifier
+          result-files: ${{ steps.all-artifacts.outputs.artifacts-root }}/Result-*/result.json
+          output-path: ${{github.workspace}}/merged-result.json
+
+      - name: Docs
+        uses: competitive-verifier/actions/docs@v1
+        with:
+          verify-result: ${{github.workspace}}/merged-result.json
+          destination: ${{github.workspace}}/_jekyll
+          write-summary: true
+
+      - name: Build with Jekyll
+        uses: actions/jekyll-build-pages@v1
+        with:
+          source: _jekyll
+          destination: _site
+      - name: Upload artifact
+        id: upload-pages
+        uses: actions/upload-pages-artifact@v1
+        with:
+          path: _site
+
+      - name: Check
+        uses: competitive-verifier/actions/check@v1
+        with:
+          verify-result: ${{github.workspace}}/merged-result.json
