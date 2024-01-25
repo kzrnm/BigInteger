@@ -249,11 +249,7 @@ namespace Kzrnm.Numerics.Decimal
                     ulong carry = 0;
                     for (int i = s.Length - 1; i >= 0; i--)
                     {
-                        var value = new UInt128(carry, s[i]);
-                        var digit = value / Base;
-                        Debug.Assert(digit >> 64 == 0);
-                        s[i] = (ulong)digit;
-                        carry = (ulong)(value - digit * Base);
+                        s[i] = DivRem64(carry, s[i], Base, out carry);
                     }
                     dst[0] = carry;
                     dst = dst[1..];
@@ -360,8 +356,7 @@ namespace Kzrnm.Numerics.Decimal
 
                 // First guess for the current digit of the quotient,
                 // which naturally must have only 64 bits...
-                UInt128 digit128 = new UInt128(valHi, valMi) / divHi;
-                ulong digit = digit128 > 0xFFFFFFFFFFFFFFFF ? 0xFFFFFFFFFFFFFFFF : (ulong)digit128;
+                ulong digit = valHi >= divHi ? 0xFFFFFFFFFFFFFFFF : DivRem64(valHi, valMi, divHi, out _);
 
                 // Our first guess may be a little bit to big
                 while (DivideGuessTooBig(digit, valHi, valMi, valLo, divHi, divLo))
@@ -511,7 +506,7 @@ namespace Kzrnm.Numerics.Decimal
             // if: BitOperations.LeadingZeroCount(left[^1]) < sigmaSmall, requires one more digit obviously.
             // if: BitOperations.LeadingZeroCount(left[^1]) == sigmaSmall, requires one more digit, because the leftmost bit of a must be 0.
 
-            if (mul * (UInt128)left[^1] >= (Base / 2))
+            if (Math.BigMul(mul, left[^1], out var bb) > 0 || bb >= (Base / 2))
                 ++aLength;
 
             ulong[]? aFromPool = null;
@@ -616,12 +611,10 @@ namespace Kzrnm.Numerics.Decimal
 
                 if (mul != 1)
                 {
-                    UInt128 mul128 = mul;
-                    UInt128 carry = 0;
+                    ulong carry = 0;
                     for (int i = rt.Length - 1; i >= 0; i--)
                     {
-                        (var quo, carry) = UInt128.DivRem(carry * Base + rt[i], mul128);
-                        rt[i] = (ulong)quo;
+                        rt[i] = DivRem(carry, rt[i], mul, out carry);
                     }
                     Debug.Assert(carry == 0);
                 }

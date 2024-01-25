@@ -135,47 +135,66 @@ namespace Kzrnm.Numerics.Decimal
         }
 
         [MethodImpl(256)]
-        public static ulong DivRem(ulong hi, ulong lo, ulong d, out ulong remainder)
+        public static ulong DivRem(ulong hi, ulong lo, ulong d, out ulong rem)
         {
             Debug.Assert(hi < d);
             ulong q;
             if (hi == 0)
             {
-                (q, remainder) = Math.DivRem(lo, d);
+                (q, rem) = Math.DivRem(lo, d);
                 return q;
             }
-            {
-                // To 64 bits
-                hi = Math.BigMul(hi, Base, out var hilo2);
-                lo += hilo2;
-                if (lo < hilo2)
-                    ++hi;
+            // To 64 bits
+            hi = Math.BigMul(hi, Base, out var hilo2);
+            lo += hilo2;
+            if (lo < hilo2)
+                ++hi;
 
-                if (hi == 0)
-                {
-                    (q, remainder) = Math.DivRem(lo, d);
-                    return q;
-                }
+            return DivRem64(hi, lo, d, out rem);
+        }
+
+        [MethodImpl(256)]
+        public static UInt128 DivRem128(ulong hi, ulong lo, ulong d, out ulong rem)
+        {
+            if (hi < d)
+                return new(0, DivRem64(hi, lo, d, out rem));
+
+            var qhi = DivRem64(0, hi, d, out var r);
+            return new UInt128(qhi, DivRem64(r, lo, d, out rem));
+        }
+
+        [MethodImpl(256)]
+        public static ulong DivRem64(ulong hi, ulong lo, ulong d, out ulong rem)
+        {
+            Debug.Assert(hi < d);
+            ulong q;
+            if (hi == 0)
+            {
+                (q, rem) = Math.DivRem(lo, d);
+                return q;
             }
 
             int shift = BitOperations.LeadingZeroCount(d);
-            int backShift = 64 - shift;
-            d <<= shift;
-            hi = (hi << shift) | (lo >> backShift);
-            lo <<= shift;
+            if (shift != 0)
+            {
+                int backShift = 64 - shift;
+                d <<= shift;
+                hi = (hi << shift) | (lo >> backShift);
+                lo <<= shift;
+            }
 
             var lohi = lo >> 32;
             var lolo = (uint)lo;
 
             q = D3n2n(hi, lohi, d, out ulong r1) << 32;
-            q |= D3n2n(r1, lolo, d, out remainder);
-            remainder >>= shift;
+            q |= D3n2n(r1, lolo, d, out rem);
+            if (shift != 0)
+                rem >>= shift;
             return q;
 
             [MethodImpl(256)]
             static ulong D3n2n(ulong a12, ulong a3, ulong b, out ulong rem)
             {
-                Debug.Assert((a12 >> 32) < b);
                 var b1 = b >> 32;
                 var b2 = (uint)b;
                 ulong quo;
