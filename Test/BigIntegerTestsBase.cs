@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using System;
+using System.Diagnostics;
 using System.Numerics;
 using System.Reflection;
 
@@ -171,10 +172,15 @@ namespace Kzrnm.Numerics.Test
             [DebuggerStepThrough]
             void Impl()
             {
+#if NET8_0_OR_GREATER
                 var bytesObj = actual.GetType().GetMethod(nameof(OrigBigInteger.ToByteArray), BindingFlags.Public | BindingFlags.Instance, [])
                     ?.Invoke(actual, []);
                 if (bytesObj is byte[] bytes)
+                {
+                    var expectedBytes = expected.ToByteArray();
                     bytes.Should().Equal(expected.ToByteArray());
+                }
+#endif
                 actual.ToString().Should().Be(expected.ToString());
             }
         }

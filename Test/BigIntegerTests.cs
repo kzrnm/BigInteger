@@ -8,15 +8,23 @@ namespace Kzrnm.Numerics.Test
         [Fact]
         public void ParseHex()
         {
-            for (int i = 31; i < 300; i++)
+            for (int i = 1; i < 300; i++)
+            {
+                var s = "F" + new string('0', i) + "1";
+                Equal(MyBigInteger.Parse(s, NumberStyles.HexNumber), OrigBigInteger.Parse(s, NumberStyles.HexNumber));
+            }
+            for (int i = 1; i < 300; i++)
             {
                 MyBigInteger.TryParse("F" + new string('0', i - 1) + "1", NumberStyles.HexNumber, null, out var result);
                 result.Should().Be((MyBigInteger.MinusOne << (4 * i)) + 1);
             }
             for (int i = 0; i < 300; i++)
             {
-                MyBigInteger.TryParse("F" + new string('0', i), NumberStyles.HexNumber, null, out var result);
-                result.Should().Be(MyBigInteger.MinusOne << (4 * i));
+                for (int j = 1; j < 6; j++)
+                {
+                    MyBigInteger.TryParse(new string('F', j) + new string('0', i), NumberStyles.HexNumber, null, out var result);
+                    result.Should().Be(MyBigInteger.MinusOne << (4 * i));
+                }
             }
             for (int i = 0; i < 300; i++)
             {
@@ -27,7 +35,7 @@ namespace Kzrnm.Numerics.Test
             var rnd = new Random(227);
             for (int len = 1; len < 200; len++)
             {
-                for (int k = 0; k < 10; k++)
+                for (int k = 0; k < 60; k++)
                 {
                     var s = Enumerable.Repeat(rnd, len).Select(rnd => HexConverter.ToCharUpper(rnd.Next())).ToArray();
                     Equal(MyBigInteger.Parse(s, NumberStyles.HexNumber), OrigBigInteger.Parse(s, NumberStyles.HexNumber));
