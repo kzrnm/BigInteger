@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<TargetFrameworks>net8.0;net7.0</TargetFrameworks>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<RootNamespace>Kzrnm.Numerics.Test</RootNamespace>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\BigInteger\BigInteger.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Competitive.IO" Version="2.1.0" />
+		<PackageReference Include="CompetitiveVerifierProblem" Version="2.0.0" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Folder Include="Properties\" />
+	</ItemGroup>
+</Project>
