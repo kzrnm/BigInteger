@@ -1,4 +1,6 @@
-﻿namespace Kzrnm.Numerics.Test
+﻿using Kzrnm.Numerics.Experiment;
+
+namespace Kzrnm.Numerics.Test
 {
     public class BigIntegerNativeTests : BigIntegerTestsBase<BigIntegerNative>
     {

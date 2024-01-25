@@ -6,6 +6,7 @@ using BenchmarkDotNet.Running;
 using BenchmarkDotNet.Toolchains.CoreRun;
 using BenchmarkDotNet.Toolchains.CsProj;
 using Kzrnm.Numerics;
+using Kzrnm.Numerics.Experiment;
 using System;
 using System.Diagnostics;
 using System.Numerics;
@@ -68,9 +69,6 @@ public class BigIntegerParse
 
     [Benchmark]
     public MyBigInteger New() => MyBigInteger.Parse(s);
-
-    [Benchmark]
-    public BigIntegerNative Native() => BigIntegerNative.Parse(s);
 }
 
 [Config(typeof(BenchmarkConfig))]
@@ -134,9 +132,6 @@ public class BigIntegerAdd
 
     [Benchmark]
     public MyBigInteger New() => my1 + my2;
-
-    [Benchmark]
-    public BigIntegerNative Native() => na1 + na2;
 }
 
 [Config(typeof(BenchmarkConfig))]
@@ -172,9 +167,6 @@ public class BigIntegerMultiply
 
     [Benchmark]
     public MyBigInteger New() => my1 * my2;
-
-    [Benchmark]
-    public BigIntegerNative Native() => na1 * na2;
 }
 
 [Config(typeof(BenchmarkConfig))]
@@ -210,7 +202,4 @@ public class BigIntegerDivide
 
     [Benchmark]
     public MyBigInteger New() => my1 / my2;
-
-    [Benchmark]
-    public BigIntegerNative Native() => na1 / na2;
 }

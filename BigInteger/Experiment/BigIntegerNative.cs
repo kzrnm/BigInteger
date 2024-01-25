@@ -9,10 +9,8 @@ using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using System.Text;
-using Kzrnm.Numerics.Experiment;
 
-namespace Kzrnm.Numerics
+namespace Kzrnm.Numerics.Experiment
 {
     [DebuggerDisplay("{DebuggerDisplay,nq}")]
     public struct BigIntegerNative
