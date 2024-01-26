@@ -152,6 +152,14 @@ namespace Kzrnm.Numerics.Test
                 Equal(my, orig);
                 my.ToString().Should().Be(orig.ToString());
             }
+            foreach (int i in new int[] { 1000, 10000 })
+            {
+                var s = "1" + new string('0', i);
+                var my = T.Parse(s, null);
+                var orig = OrigBigInteger.Parse(s);
+                Equal(my, orig);
+                my.ToString().Should().Be(orig.ToString());
+            }
             for (int i = 1; i < 50; i++)
             {
                 var s = new string('9', i);
