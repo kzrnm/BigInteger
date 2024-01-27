@@ -162,7 +162,7 @@ namespace Kzrnm.Numerics.Logic
         {
             Debug.Assert(left.Length >= right.Length);
             Debug.Assert(bits.Length >= left.Length + right.Length);
-            Debug.Assert(bits.Trim(0u).Length == 0);
+            bits = bits.Slice(0, left.Length + right.Length);
 
             if (left.Length - right.Length < 3)
             {
@@ -177,7 +177,7 @@ namespace Kzrnm.Numerics.Logic
         private static void MultiplyFarLength(ReadOnlySpan<uint> left, ReadOnlySpan<uint> right, Span<uint> bits)
         {
             Debug.Assert(left.Length - right.Length >= 3);
-            Debug.Assert(bits.Length >= left.Length + right.Length);
+            Debug.Assert(bits.Length == left.Length + right.Length);
             Debug.Assert(bits.Trim(0u).Length == 0);
 
             // Executes different algorithms for computing z = a * b
@@ -373,7 +373,7 @@ namespace Kzrnm.Numerics.Logic
         private static void MultiplyNearLength(ReadOnlySpan<uint> left, ReadOnlySpan<uint> right, Span<uint> bits)
         {
             Debug.Assert(left.Length - right.Length < 3);
-            Debug.Assert(bits.Length >= left.Length + right.Length);
+            Debug.Assert(bits.Length == left.Length + right.Length);
             Debug.Assert(bits.Trim(0u).Length == 0);
 
             // Executes different algorithms for computing z = a * b

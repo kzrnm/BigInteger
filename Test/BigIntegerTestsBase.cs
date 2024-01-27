@@ -144,39 +144,48 @@ namespace Kzrnm.Numerics.Test
         [Fact]
         public void ParseAndToStringTest()
         {
+            foreach (int i in new int[] { 865, 20161 })
+                Test(new string('9', i));
+
             for (int i = 0; i < 50; i++)
-            {
-                var s = "1" + new string('0', i);
-                var my = T.Parse(s, null);
-                var orig = OrigBigInteger.Parse(s);
-                Equal(my, orig);
-                my.ToString().Should().Be(orig.ToString());
-            }
+                Test("1" + new string('0', i));
+
             foreach (int i in new int[] { 1000, 10000 })
-            {
-                var s = "1" + new string('0', i);
-                var my = T.Parse(s, null);
-                var orig = OrigBigInteger.Parse(s);
-                Equal(my, orig);
-                my.ToString().Should().Be(orig.ToString());
-            }
+                Test("1" + new string('0', i));
+
+            foreach (int i in new int[] { 1000, 10000 })
+                Test(new string('1', i) + new string('0', i));
+
             for (int i = 1; i < 50; i++)
-            {
-                var s = new string('9', i);
-                var my = T.Parse(s, null);
-                var orig = OrigBigInteger.Parse(s);
-                Equal(my, orig);
-                my.ToString().Should().Be(orig.ToString());
-            }
+                Test(new string('9', i));
+
             for (int i = 1; i < 50; i++)
+                Test(new string('1', i) + new string('0', i));
+
+            foreach (var v in PlusMinus(0))
+                Test(v.ToString());
+            foreach (var v in PlusMinus(int.MinValue))
+                Test(v.ToString());
+            foreach (var v in PlusMinus(int.MaxValue))
+                Test(v.ToString());
+            foreach (var v in PlusMinus(long.MinValue))
+                Test(v.ToString());
+            foreach (var v in PlusMinus(long.MaxValue))
+                Test(v.ToString());
+
+            var rnd = new Random(227);
+            for (int i = 0; i < 100; i++)
+                Test(rnd.GetRandomDigits(rnd.Next(2000, 5000)));
+
+            void Test(string s)
             {
-                var s = new string('1', i) + new string('0', i);
                 var my = T.Parse(s, null);
                 var orig = OrigBigInteger.Parse(s);
                 Equal(my, orig);
-                my.ToString().Should().Be(orig.ToString());
             }
         }
+
+        static IEnumerable<Int128> PlusMinus(Int128 v) => [v - 1, v, v + 1];
 
         public static void Equal(T actual, OrigBigInteger expected)
         {

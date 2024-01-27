@@ -867,7 +867,7 @@ namespace Kzrnm.Numerics.Experiment
                 while (quotient[++qi] == 0) ;
                 Debug.Assert((uint)qi < (uint)quotient.Length);
                 --quotient[qi];
-                quotient.Slice(0, qi).Fill(uint.MaxValue);
+                quotient.Slice(0, qi).Fill(nuint.MaxValue);
             }
 
             SubtractSelf(rr, d);
