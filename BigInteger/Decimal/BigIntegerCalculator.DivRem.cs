@@ -74,7 +74,7 @@ namespace Kzrnm.Numerics.Decimal
             DummyForDebug(remainder);
 
             if (right.Length < DivideThreshold || left.Length - right.Length < DivideThreshold)
-                DivideUInt64(left, right, quotient, remainder);
+                DivideGrammarSchool(left, right, quotient, remainder);
             else
                 DivideBurnikelZiegler(left, right, quotient, remainder);
         }
@@ -88,7 +88,16 @@ namespace Kzrnm.Numerics.Decimal
             DummyForDebug(quotient);
 
             if (right.Length < DivideThreshold || left.Length - right.Length < DivideThreshold)
-                DivideUInt64(left, right, quotient, default);
+            {
+                ulong[]? remainderFromPool = null;
+                Span<ulong> remainder = (left.Length <= StackAllocThreshold ?
+                                      stackalloc ulong[StackAllocThreshold]
+                                      : remainderFromPool = ArrayPool<ulong>.Shared.Rent(left.Length)).Slice(0, left.Length);
+
+                DivideGrammarSchool(left, right, quotient, remainder);
+                if (remainderFromPool != null)
+                    ArrayPool<ulong>.Shared.Return(remainderFromPool);
+            }
             else
                 DivideBurnikelZiegler(left, right, quotient, default);
 
@@ -102,24 +111,22 @@ namespace Kzrnm.Numerics.Decimal
             Debug.Assert(remainder.Length == left.Length);
             DummyForDebug(remainder);
 
+
+            int quotientLength = left.Length - right.Length + 1;
+            ulong[]? quotientFromPool = null;
+
+            Span<ulong> quotient = (quotientLength <= StackAllocThreshold ?
+                                  stackalloc ulong[StackAllocThreshold]
+                                  : quotientFromPool = ArrayPool<ulong>.Shared.Rent(quotientLength)).Slice(0, quotientLength);
+
             if (right.Length < DivideThreshold || left.Length - right.Length < DivideThreshold)
-            {
-                DivideUInt64(left, right, default, remainder);
-            }
+                DivideGrammarSchool(left, right, default, remainder);
             else
-            {
-                int quotientLength = left.Length - right.Length + 1;
-                ulong[]? quotientFromPool = null;
-
-                Span<ulong> quotient = (quotientLength <= StackAllocThreshold ?
-                                      stackalloc ulong[StackAllocThreshold]
-                                      : quotientFromPool = ArrayPool<ulong>.Shared.Rent(quotientLength)).Slice(0, quotientLength);
-
                 DivideBurnikelZiegler(left, right, quotient, remainder);
 
-                if (quotientFromPool != null)
-                    ArrayPool<ulong>.Shared.Return(quotientFromPool);
-            }
+            if (quotientFromPool != null)
+                ArrayPool<ulong>.Shared.Return(quotientFromPool);
+
         }
 
         static void DivRem(Span<ulong> left, ReadOnlySpan<ulong> right, Span<ulong> quotient)
@@ -140,177 +147,121 @@ namespace Kzrnm.Numerics.Decimal
                                   : leftCopyFromPool = ArrayPool<ulong>.Shared.Rent(left.Length)).Slice(0, left.Length);
             left.CopyTo(leftCopy);
 
-            if (right.Length < DivideThreshold || left.Length - right.Length < DivideThreshold)
-                DivideUInt64(leftCopy, right, quotient, left);
-            else
+            ulong[]? quotientActualFromPool = null;
+            scoped Span<ulong> quotientActual;
+
+            if (quotient.Length == 0)
             {
-                ulong[]? quotientActualFromPool = null;
-                scoped Span<ulong> quotientActual;
+                int quotientLength = left.Length - right.Length + 1;
 
-                if (quotient.Length == 0)
-                {
-                    int quotientLength = left.Length - right.Length + 1;
+                quotientActual = (quotientLength <= StackAllocThreshold ?
+                            stackalloc ulong[StackAllocThreshold]
+                            : quotientActualFromPool = ArrayPool<ulong>.Shared.Rent(quotientLength)).Slice(0, quotientLength);
+            }
+            else
+                quotientActual = quotient;
 
-                    quotientActual = (quotientLength <= StackAllocThreshold ?
-                                stackalloc ulong[StackAllocThreshold]
-                                : quotientActualFromPool = ArrayPool<ulong>.Shared.Rent(quotientLength)).Slice(0, quotientLength);
-                }
-                else
-                    quotientActual = quotient;
-
+            if (right.Length < DivideThreshold || left.Length - right.Length < DivideThreshold)
+                DivideGrammarSchool(leftCopy, right, quotient, left);
+            else
                 DivideBurnikelZiegler(leftCopy, right, quotientActual, left);
 
-                if (quotientActualFromPool != null)
-                    ArrayPool<ulong>.Shared.Return(quotientActualFromPool);
-            }
+            if (quotientActualFromPool != null)
+                ArrayPool<ulong>.Shared.Return(quotientActualFromPool);
             if (leftCopyFromPool != null)
                 ArrayPool<ulong>.Shared.Return(leftCopyFromPool);
         }
 
-        static void DivideUInt64(ReadOnlySpan<ulong> left, ReadOnlySpan<ulong> right, Span<ulong> quotient, Span<ulong> remainder)
+        static void DivideGrammarSchool(ReadOnlySpan<ulong> left, scoped ReadOnlySpan<ulong> right, Span<ulong> quotient, Span<ulong> remainder)
         {
             Debug.Assert(left.Length >= 1);
             Debug.Assert(right.Length >= 1);
-            Debug.Assert(remainder.Length == 0 || remainder.Length >= right.Length);
+            Debug.Assert(left.Length >= right.Length);
+            Debug.Assert(remainder.Length == left.Length);
+            Debug.Assert(
+                quotient.Length == 0
+                || quotient.Length == left.Length - right.Length + 1
+                || (CompareActual(left.Slice(left.Length - right.Length), right) < 0 && quotient.Length == left.Length - right.Length));
+            ulong mul = Base / (right[^1] + 1);
+            ulong[]? leftMulFromPool = null;
+            ulong[]? rightMulFromPool = null;
+            Span<ulong> leftMul = (left.Length + 1 < StackAllocThreshold
+                    ? stackalloc ulong[StackAllocThreshold]
+                    : leftMulFromPool = ArrayPool<ulong>.Shared.Rent(left.Length + 1)).Slice(0, left.Length + 1);
+
+            leftMul[^1] = 0;
+            scoped ReadOnlySpan<ulong> rightMul;
+
+            if (mul != 1)
+            {
+                {
+                    var tmp = (right.Length < StackAllocThreshold
+                           ? stackalloc ulong[StackAllocThreshold]
+                           : rightMulFromPool = ArrayPool<ulong>.Shared.Rent(right.Length)).Slice(0, right.Length);
+
+                    int i = 0;
+                    ulong carry = 0UL;
+
+                    for (; i < right.Length; i++)
+                    {
+                        carry = BigMulAdd(right[i], mul, carry, out tmp[i]);
+                    }
+                    Debug.Assert(carry == 0);
+                    rightMul = tmp;
+                }
+                {
+                    int i = 0;
+                    ulong carry = 0UL;
+
+                    for (; i < left.Length; i++)
+                    {
+                        carry = BigMulAdd(left[i], mul, carry, out leftMul[i]);
+                    }
+                    leftMul[i] = carry;
+                }
+            }
+            else
+            {
+                rightMul = right;
+                left.CopyTo(leftMul);
+            }
+            leftMul = leftMul.TrimEnd(0u);
+            Debug.Assert((uint)(leftMul.Length - left.Length) <= 1);
+
+            DivideGrammarSchool(leftMul, rightMul, quotient);
+
+
+            if (mul != 1)
+            {
+                ulong carry = leftMul.Length > remainder.Length ? leftMul[^1] : 0;
+                for (int i = remainder.Length - 1; i >= 0; i--)
+                {
+                    remainder[i] = DivRem(carry, leftMul[i], mul, out carry);
+                }
+            }
+            else
+            {
+                remainder.Clear();
+                leftMul.TrimEnd(0u).CopyTo(remainder);
+            }
+
+            if (leftMulFromPool != null)
+                ArrayPool<ulong>.Shared.Return(leftMulFromPool);
+            if (rightMulFromPool != null)
+                ArrayPool<ulong>.Shared.Return(rightMulFromPool);
+        }
+
+        static void DivideGrammarSchool(Span<ulong> left, scoped ReadOnlySpan<ulong> right, Span<ulong> quotient)
+        {
+            Debug.Assert(left.Length >= 1);
+            Debug.Assert(right.Length >= 1);
+            Debug.Assert(left.Length >= right.Length);
             Debug.Assert(
                 quotient.Length == 0
                 || quotient.Length == left.Length - right.Length + 1
                 || (CompareActual(left.Slice(left.Length - right.Length), right) < 0 && quotient.Length == left.Length - right.Length));
 
-
-            const double ratio = 0.9342922767; // log_1E18(2^64)
-
-            int left64Length = (int)(left.Length * ratio) + 1;
-            ulong[]? left64FromPool = null;
-            var left64 = (left64Length <= StackAllocThreshold
-                        ? stackalloc ulong[StackAllocThreshold]
-                        : left64FromPool = ArrayPool<ulong>.Shared.Rent(left64Length)).Slice(0, left64Length);
-
-            int right64Length = (int)(right.Length * ratio) + 1;
-            ulong[]? right64FromPool = null;
-            var right64 = (right64Length <= StackAllocThreshold
-                        ? stackalloc ulong[StackAllocThreshold]
-                        : right64FromPool = ArrayPool<ulong>.Shared.Rent(right64Length)).Slice(0, right64Length);
-
-            static void ToUInt64(ReadOnlySpan<ulong> src, Span<ulong> dst)
-            {
-                dst[0] = src[^1];
-                dst[1..].Clear();
-                int len = 1;
-                for (int i = src.Length - 2; i >= 0; i--)
-                {
-                    // * Base
-                    {
-                        ulong carry = 0;
-                        foreach (ref var dd in dst[..len])
-                        {
-                            var hi = Math.BigMul(dd, Base, out dd);
-                            dd += carry;
-                            if (dd < carry)
-                                ++hi;
-                            carry = hi;
-                        }
-                        if (carry != 0)
-                            dst[len++] = carry;
-                    }
-
-                    // + src[i]
-                    {
-                        var carry = src[i];
-                        foreach (ref var dd in dst[..len])
-                        {
-                            dd += carry;
-                            if (dd < carry)
-                                carry = 1;
-                            else
-                            {
-                                carry = 0;
-                                break;
-                            }
-                        }
-                        if (carry != 0)
-                            dst[len++] = carry;
-                    }
-                }
-            }
-
-            static void FromUInt64(scoped ReadOnlySpan<ulong> src, Span<ulong> dst)
-            {
-                var dst2 = dst;
-
-                ulong[]? srcCopyFromPool = null;
-                var s = (src.Length <= StackAllocThreshold
-                            ? stackalloc ulong[StackAllocThreshold]
-                            : srcCopyFromPool = ArrayPool<ulong>.Shared.Rent(src.Length)).Slice(0, src.Length);
-                src.CopyTo(s);
-
-                while (s.Length > 0)
-                {
-                    ulong carry = 0;
-                    for (int i = s.Length - 1; i >= 0; i--)
-                    {
-                        s[i] = DivRem64(carry, s[i], Base, out carry);
-                    }
-                    dst[0] = carry;
-                    dst = dst[1..];
-                    s = s[..ActualLength(s)];
-                }
-
-                if (srcCopyFromPool != null)
-                    ArrayPool<ulong>.Shared.Return(srcCopyFromPool);
-
-                dst.Clear();
-            }
-
-            ToUInt64(left, left64);
-            ToUInt64(right, right64);
-
-            left64 = left64[..ActualLength(left64)];
-            right64 = right64[..ActualLength(right64)];
-
-            if (left64.Length < right64.Length)
-            {
-                quotient.Clear();
-                if (remainder.Length >= left.Length)
-                {
-                    left.CopyTo(remainder);
-                    remainder.Slice(left.Length).Clear();
-                }
-                return;
-            }
-
-            if (quotient.Length == 0)
-            {
-                DivideGrammarSchool(left64, right64, default);
-            }
-            else
-            {
-                int quotient64Length = left64.Length - right64.Length + 1;
-                ulong[]? quotient64FromPool = null;
-                var quotient64 = (quotient64Length <= StackAllocThreshold
-                            ? stackalloc ulong[StackAllocThreshold]
-                            : quotient64FromPool = ArrayPool<ulong>.Shared.Rent(quotient64Length)).Slice(0, quotient64Length);
-
-                DivideGrammarSchool(left64, right64, quotient64);
-                quotient64 = quotient64[..ActualLength(quotient64)];
-                FromUInt64(quotient64, quotient);
-
-                if (quotient64FromPool != null)
-                    ArrayPool<ulong>.Shared.Return(quotient64FromPool);
-            }
-
-            if (remainder.Length != 0)
-                FromUInt64(left64, remainder);
-
-            if (right64FromPool != null)
-                ArrayPool<ulong>.Shared.Return(right64FromPool);
-            if (left64FromPool != null)
-                ArrayPool<ulong>.Shared.Return(left64FromPool);
-        }
-
-        private static void DivideGrammarSchool(Span<ulong> left, ReadOnlySpan<ulong> right, Span<ulong> quotient)
-        {
-            Debug.Assert(Environment.Is64BitProcess);
+            Debug.Assert(right[^1] >= Base / 2);
 
             // Executes the "grammar-school" algorithm for computing q = a / b.
             // Before calculating q_i, we get more bits into the highest bit
@@ -320,43 +271,19 @@ namespace Kzrnm.Numerics.Decimal
             ulong divHi = right[right.Length - 1];
             ulong divLo = right.Length > 1 ? right[right.Length - 2] : 0;
 
-            // We measure the leading zeros of the divisor
-            int shift = BitOperations.LeadingZeroCount(divHi);
-            int backShift = 64 - shift;
-
-            // And, we make sure the most significant bit is set
-            if (shift > 0)
-            {
-                ulong divNx = right.Length > 2 ? right[right.Length - 3] : 0;
-
-                divHi = (divHi << shift) | (divLo >> backShift);
-                divLo = (divLo << shift) | (divNx >> backShift);
-            }
 
             // Then, we divide all of the bits as we would do it using
             // pen and paper: guessing the next digit, subtracting, ...
             for (int i = left.Length; i >= right.Length; i--)
             {
                 int n = i - right.Length;
-
-                ulong t = (uint)i < (uint)left.Length ? left[i] : 0;
-                ulong valHi = t;
+                ulong valHi = (uint)i < (uint)left.Length ? left[i] : 0;
                 ulong valMi = left[i - 1];
                 ulong valLo = i > 1 ? left[i - 2] : 0;
 
-                // We shifted the divisor, we shift the dividend too
-                if (shift > 0)
-                {
-                    ulong valNx = i > 2 ? left[i - 3] : 0;
-
-                    valHi = (valHi << shift) | (valMi >> backShift);
-                    valMi = (valMi << shift) | (valLo >> backShift);
-                    valLo = (valLo << shift) | (valNx >> backShift);
-                }
-
                 // First guess for the current digit of the quotient,
-                // which naturally must have only 64 bits...
-                ulong digit = valHi >= divHi ? 0xFFFFFFFFFFFFFFFF : DivRem64(valHi, valMi, divHi, out _);
+                // which naturally must have only 32 bits...
+                ulong digit = valHi >= divHi ? ulong.MaxValue : DivRem(valHi, valMi, divHi, out _);
 
                 // Our first guess may be a little bit to big
                 while (DivideGuessTooBig(digit, valHi, valMi, valLo, divHi, divLo))
@@ -366,9 +293,9 @@ namespace Kzrnm.Numerics.Decimal
                 {
                     // Now it's time to subtract our current quotient
                     ulong carry = SubtractDivisor(left.Slice(n), right, digit);
-                    if (carry != t)
+                    if (carry != valHi)
                     {
-                        Debug.Assert(carry == t + 1);
+                        Debug.Assert(carry == valHi + 1);
 
                         // Our guess was still exactly one too high
                         carry = AddDivisor(left.Slice(n), right);
@@ -385,7 +312,6 @@ namespace Kzrnm.Numerics.Decimal
                 if ((uint)i < (uint)left.Length)
                     left[i] = 0;
             }
-
             static ulong AddDivisor(Span<ulong> left, ReadOnlySpan<ulong> right)
             {
                 Debug.Assert(left.Length >= right.Length);
@@ -396,20 +322,15 @@ namespace Kzrnm.Numerics.Decimal
 
                 for (int i = 0; i < right.Length; i++)
                 {
-                    ulong hi = 0;
-                    ref ulong leftElement = ref left[i];
-                    leftElement += carry;
-                    if (leftElement < carry)
-                        ++hi;
-                    leftElement += right[i];
-                    if (leftElement < right[i])
-                        ++hi;
-
+                    ref var leftElement = ref left[i];
+                    var hi = SafeAdd(ref leftElement, carry);
+                    hi += SafeAdd(ref leftElement, right[i]);
                     carry = hi;
                 }
 
                 return carry;
             }
+
 
             static ulong SubtractDivisor(Span<ulong> left, ReadOnlySpan<ulong> right, ulong q)
             {
@@ -418,23 +339,16 @@ namespace Kzrnm.Numerics.Decimal
                 // Combines a subtract and a multiply operation, which is naturally
                 // more efficient than multiplying and then subtracting...
 
-                ulong carry = 0;
-                ulong carryHi = 0;
+                ulong carry = 0UL;
 
                 for (int i = 0; i < right.Length; i++)
                 {
-                    ulong hi = Math.BigMul(right[i], q, out ulong digit);
-                    digit += carry;
-                    if (digit < carry)
-                        ++hi;
-                    carry = carryHi + hi;
-                    carryHi = carry < hi ? 1u : 0;
-
-                    ref ulong leftElement = ref left[i];
+                    carry = BigMulAdd(right[i], q, carry, out var digit);
+                    ref var leftElement = ref left[i];
                     if (leftElement < digit)
                     {
-                        if (++carry == 0)
-                            ++carryHi;
+                        ++carry;
+                        leftElement += Base;
                     }
                     leftElement -= digit;
                 }
@@ -449,23 +363,16 @@ namespace Kzrnm.Numerics.Decimal
                 // than the three most significant limbs of the current dividend
                 // we return true, which means the current guess is still too big.
 
-                ulong chkHi = Math.BigMul(divHi, q, out ulong chkMi1);
-                ulong chkMi2 = Math.BigMul(divLo, q, out ulong chkLo);
 
-                ulong chkMi = chkMi1 + chkMi2;
-                if (chkMi < chkMi1)
-                    ++chkHi;
+                var chkHi = BigMul(divHi, q, out var chkMi);
+                chkHi += SafeAdd(ref chkMi, BigMul(divLo, q, out var chkLo));
 
                 if (chkHi > valHi)
                     return true;
                 if (chkHi == valHi)
                 {
-                    if (chkMi > valMi)
-                        return true;
-                    if (chkMi == valMi)
-                        return chkLo > valLo;
+                    return (chkMi > valMi) || ((chkMi == valHi) && (chkLo > valLo));
                 }
-
                 return false;
             }
         }
@@ -486,14 +393,14 @@ namespace Kzrnm.Numerics.Decimal
             // Fast recursive division: Algorithm 3
             int n;
             {
-                int m = (int)BitOperations.RoundUpToPowerOf2((ulong)(right.Length + DivideThreshold - 1) / (ulong)DivideThreshold);
+                int m = (int)BitOperations.RoundUpToPowerOf2((uint)(right.Length + DivideThreshold - 1) / (uint)DivideThreshold);
 
                 int j = (right.Length + m - 1) / m; // Ceil(right.Length/m)
                 n = j * m;
             }
 
             int sigmaDigit = n - right.Length;
-            ulong mul = Base / (right[^1] + 1);
+            var sigmaMul = Base / (right[^1] + 1);
 
             ulong[]? bFromPool = null;
 
@@ -505,9 +412,11 @@ namespace Kzrnm.Numerics.Decimal
 
             // if: BitOperations.LeadingZeroCount(left[^1]) < sigmaSmall, requires one more digit obviously.
             // if: BitOperations.LeadingZeroCount(left[^1]) == sigmaSmall, requires one more digit, because the leftmost bit of a must be 0.
+            {
+                if (Math.BigMul(left[^1], sigmaMul, out var aTop) > 0 || aTop >= Base / 10)
+                    ++aLength;
+            }
 
-            if (Math.BigMul(mul, left[^1], out var bb) > 0 || bb >= (Base / 2))
-                ++aLength;
 
             ulong[]? aFromPool = null;
 
@@ -516,9 +425,8 @@ namespace Kzrnm.Numerics.Decimal
                             : aFromPool = ArrayPool<ulong>.Shared.Rent(aLength)).Slice(0, aLength);
 
             // 4. normalize
-            static void Normalize(ReadOnlySpan<ulong> src, int sigmaDigit, ulong mul, Span<ulong> bits)
+            static void Normalize(ReadOnlySpan<ulong> src, int sigmaDigit, ulong sigmaMul, Span<ulong> bits)
             {
-                Debug.Assert(mul < Base);
                 Debug.Assert(src.Length + sigmaDigit <= bits.Length);
 
                 bits.Slice(0, sigmaDigit).Clear();
@@ -526,24 +434,26 @@ namespace Kzrnm.Numerics.Decimal
                 src.CopyTo(dst);
                 dst.Slice(src.Length).Clear();
 
-                if (mul != 1)
+                if (sigmaMul > 1)
                 {
-                    // Left shift
+                    int i = 0;
                     ulong carry = 0UL;
-                    for (int i = 0; i < bits.Length; i++)
+
+                    for (; i < dst.Length; i++)
                     {
-                        carry = BigMulAdd(bits[i], mul, carry, out bits[i]);
+                        carry = BigMulAdd(dst[i], sigmaMul, carry, out dst[i]);
                     }
                     Debug.Assert(carry == 0);
                 }
             }
 
-            Normalize(left, sigmaDigit, mul, a);
-            Normalize(right, sigmaDigit, mul, b);
-
+            Normalize(left, sigmaDigit, sigmaMul, a);
+            Normalize(right, sigmaDigit, sigmaMul, b);
 
             int t = Math.Max(2, (a.Length + n - 1) / n); // Max(2, Ceil(a.Length/n))
             Debug.Assert(t < a.Length || (t == a.Length && (int)a[^1] >= 0));
+
+
 
             ulong[]? rFromPool = null;
             Span<ulong> r = ((n + 1) <= StackAllocThreshold ?
@@ -558,6 +468,7 @@ namespace Kzrnm.Numerics.Decimal
             z.Slice(a.Length - (t - 2) * n).Clear();
 
             Span<ulong> quotientUpper = quotient.Slice((t - 2) * n);
+
             if (quotientUpper.Length < n)
             {
                 ulong[]? qFromPool = null;
@@ -609,24 +520,24 @@ namespace Kzrnm.Numerics.Decimal
                 Span<ulong> rt = r.Slice(sigmaDigit);
                 remainder.Slice(rt.Length).Clear();
 
-                if (mul != 1)
+                if (sigmaMul > 1)
                 {
                     ulong carry = 0;
                     for (int i = rt.Length - 1; i >= 0; i--)
                     {
-                        rt[i] = DivRem(carry, rt[i], mul, out carry);
+                        remainder[i] = DivRem(carry, rt[i], sigmaMul, out carry);
                     }
-                    Debug.Assert(carry == 0);
                 }
-
-                rt.CopyTo(remainder);
+                else
+                    rt.CopyTo(remainder);
             }
 
             if (rFromPool != null)
                 ArrayPool<ulong>.Shared.Return(rFromPool);
         }
 
-        static void BurnikelZieglerFallback(ReadOnlySpan<ulong> left, ReadOnlySpan<ulong> right, Span<ulong> quotient, Span<ulong> remainder)
+
+        private static void BurnikelZieglerFallback(ReadOnlySpan<ulong> left, ReadOnlySpan<ulong> right, Span<ulong> quotient, Span<ulong> remainder)
         {
             // Fast recursive division: Algorithm 1
             // 1. If n is odd or smaller than some convenient constant
@@ -672,16 +583,33 @@ namespace Kzrnm.Numerics.Decimal
             }
             else
             {
+                ulong[]? r1FromPool = null;
+                Span<ulong> r1 = (left.Length <= StackAllocThreshold ?
+                                stackalloc ulong[StackAllocThreshold]
+                                : r1FromPool = ArrayPool<ulong>.Shared.Rent(left.Length)).Slice(0, left.Length);
+
+                left.CopyTo(r1);
                 int quotientLength = Math.Min(left.Length - right.Length + 1, quotient.Length);
 
                 quotient.Slice(quotientLength).Clear();
-                remainder.Slice(right.Length).Clear();
-                DivideUInt64(left, right, quotient.Slice(0, quotientLength), remainder.Slice(0, right.Length));
+                DivideGrammarSchool(r1, right, quotient.Slice(0, quotientLength));
+
+                if (r1.Length < remainder.Length)
+                {
+                    remainder.Slice(r1.Length).Clear();
+                    r1.CopyTo(remainder);
+                }
+                else
+                {
+                    Debug.Assert(r1.Slice(remainder.Length).Trim(0u).Length == 0);
+                    r1.Slice(0, remainder.Length).CopyTo(remainder);
+                }
+
+                if (r1FromPool != null)
+                    ArrayPool<ulong>.Shared.Return(r1FromPool);
             }
         }
-
-
-        static void BurnikelZieglerD2n1n(ReadOnlySpan<ulong> left, ReadOnlySpan<ulong> right, Span<ulong> quotient, Span<ulong> remainder)
+        private static void BurnikelZieglerD2n1n(ReadOnlySpan<ulong> left, ReadOnlySpan<ulong> right, Span<ulong> quotient, Span<ulong> remainder)
         {
             // Fast recursive division: Algorithm 1
             Debug.Assert(left.Length == 2 * right.Length);
@@ -710,7 +638,7 @@ namespace Kzrnm.Numerics.Decimal
                 ArrayPool<ulong>.Shared.Return(r1FromPool);
         }
 
-        static void BurnikelZieglerD3n2n(ReadOnlySpan<ulong> left12, ReadOnlySpan<ulong> left3, ReadOnlySpan<ulong> right, Span<ulong> quotient, Span<ulong> remainder)
+        private static void BurnikelZieglerD3n2n(ReadOnlySpan<ulong> left12, ReadOnlySpan<ulong> left3, ReadOnlySpan<ulong> right, Span<ulong> quotient, Span<ulong> remainder)
         {
             // Fast recursive division: Algorithm 2
             Debug.Assert(right.Length % 2 == 0);
@@ -722,10 +650,10 @@ namespace Kzrnm.Numerics.Decimal
 
             int halfN = right.Length >> 1;
 
-            ReadOnlySpan<ulong> a1 = left12.Slice(halfN);
-            ReadOnlySpan<ulong> b1 = right.Slice(halfN);
-            ReadOnlySpan<ulong> b2 = right.Slice(0, halfN);
-            Span<ulong> r1 = remainder.Slice(halfN);
+            var a1 = left12.Slice(halfN);
+            var b1 = right.Slice(halfN);
+            var b2 = right.Slice(0, halfN);
+            var r1 = remainder.Slice(halfN);
 
             if (CompareActual(a1, b1) < 0)
             {
@@ -733,7 +661,7 @@ namespace Kzrnm.Numerics.Decimal
             }
             else
             {
-                quotient.Fill(ulong.MaxValue);
+                quotient.Fill(uint.MaxValue);
 
                 ulong[]? bbFromPool = null;
 
@@ -763,16 +691,16 @@ namespace Kzrnm.Numerics.Decimal
             // R = [R1, A3]
             left3.CopyTo(remainder.Slice(0, halfN));
 
-            Span<ulong> rr = remainder.Slice(0, d.Length + 1);
+            var rr = remainder.Slice(0, d.Length + 1);
 
             while (CompareActual(rr, d) < 0)
             {
                 AddSelf(rr, right);
                 int qi = -1;
                 while (quotient[++qi] == 0) ;
-                Debug.Assert((ulong)qi < (ulong)quotient.Length);
+                Debug.Assert((uint)qi < (uint)quotient.Length);
                 --quotient[qi];
-                quotient.Slice(0, qi).Fill(ulong.MaxValue);
+                quotient.Slice(0, qi).Fill(Base - 1);
             }
 
             SubtractSelf(rr, d);
@@ -794,5 +722,6 @@ namespace Kzrnm.Numerics.Decimal
                     Multiply(left, right, bits);
             }
         }
+
     }
 }

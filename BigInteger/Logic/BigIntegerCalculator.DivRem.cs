@@ -580,8 +580,6 @@ namespace Kzrnm.Numerics.Logic
                     ArrayPool<uint>.Shared.Return(r1FromPool);
             }
         }
-
-
         private static void BurnikelZieglerD2n1n(ReadOnlySpan<uint> left, ReadOnlySpan<uint> right, Span<uint> quotient, Span<uint> remainder)
         {
             // Fast recursive division: Algorithm 1
@@ -610,7 +608,6 @@ namespace Kzrnm.Numerics.Logic
             if (r1FromPool != null)
                 ArrayPool<uint>.Shared.Return(r1FromPool);
         }
-
         private static void BurnikelZieglerD3n2n(ReadOnlySpan<uint> left12, ReadOnlySpan<uint> left3, ReadOnlySpan<uint> right, Span<uint> quotient, Span<uint> remainder)
         {
             // Fast recursive division: Algorithm 2

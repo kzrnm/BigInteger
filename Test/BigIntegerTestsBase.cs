@@ -23,6 +23,7 @@ namespace Kzrnm.Numerics.Test
             yield return new BigIntegerData("0", "2");
 
             yield return new BigIntegerData("4149515568880992958512407863691161151012446232242436899995657329690652811412908146399707048947103794288197886611300789182395151075411775307886874834113963687061181803401509523685376", "4149515568880992958512407863691161151012446232242436899995657329690652811412908146399707048947103794288197886611300789182395151075411775307886874834113963687061181803401507376201728");
+            yield return new BigIntegerData("3254524275368499316718987238542010791047407685861758100326628572335879727", "831130247779490037441982534999103126");
 
             foreach (var sign in new[] { "", "-" })
             {
@@ -132,12 +133,13 @@ namespace Kzrnm.Numerics.Test
 
                 var ss = T.Parse(data.Left, null);
                 var tt = T.Parse(data.Right, null);
-                Equal((ss / tt), quo);
-                Equal((ss % tt), rem);
 
                 var (quo2, rem2) = ((T, T))divRemMethod?.Invoke(null, [ss, tt])!;
                 Equal(quo2, quo);
                 Equal(rem2, rem);
+
+                Equal((ss / tt), quo);
+                Equal((ss % tt), rem);
             }
         }
 
