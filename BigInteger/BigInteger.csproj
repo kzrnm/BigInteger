@@ -6,8 +6,8 @@
 		<Nullable>enable</Nullable>
 		<RootNamespace>Kzrnm.Numerics</RootNamespace>
 
-		<Version>0.1.0</Version>
-		<AssemblyVersion>0.1.0.101</AssemblyVersion>
+		<Version>0.2.0</Version>
+		<AssemblyVersion>0.2.0.101</AssemblyVersion>
 
 		<PackageTags>BigInteger</PackageTags>
 		<PackageId>Kzrnm.BigInteger</PackageId>
