@@ -1,0 +1,23 @@
+{
+  "$schema": "https://raw.githubusercontent.com/kzrnm/SourceExpander/master/schema/embedder.schema.json",
+  "enabled": true,
+  "embedding-type": "gzipBase32768",
+  "minify-level": "full",
+  "embedding-source-class": {
+    "enabled": false
+  },
+  "remove-conditional": [
+    "DEBUG"
+  ],
+  "exclude-attributes": [
+    "System.Diagnostics.DebuggerBrowsableAttribute",
+    "System.Diagnostics.DebuggerDisplayAttribute",
+    "System.Diagnostics.DebuggerHiddenAttribute",
+    "System.Diagnostics.DebuggerNonUserCodeAttribute",
+    "System.Diagnostics.DebuggerStepperBoundaryAttribute",
+    "System.Diagnostics.DebuggerStepThroughAttribute",
+    "System.Diagnostics.DebuggerTypeProxyAttribute",
+    "System.Diagnostics.DebuggerVisualizerAttribute",
+    "System.ComponentModel.EditorBrowsableAttribute"
+  ]
+}
