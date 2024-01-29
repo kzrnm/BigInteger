@@ -144,6 +144,28 @@ namespace Kzrnm.Numerics.Test
         }
 
         [Fact]
+        public void ParseAndFormat()
+        {
+            {
+                var s = "-1111111111111111111111111111111111111111";
+                var num = T.Parse(s, null);
+                num.ToString().Should().Be(s);
+            }
+            for (int i = 1; i < 1000; i++)
+            {
+                var s = new string('9', i);
+                var num = T.Parse(s, null);
+                $"{num}".Should().Be(s);
+                num.ToString().Should().Be(s);
+
+                var t = $"-{s}";
+                num = T.Parse(s, null);
+                $"{T.Parse(t, null)}".Should().Be(t);
+                num.ToString().Should().Be(s);
+            }
+        }
+
+        [Fact]
         public void ParseAndToStringTest()
         {
             foreach (int i in new int[] { 865, 20161 })

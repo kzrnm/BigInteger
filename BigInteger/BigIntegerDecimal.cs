@@ -684,21 +684,10 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             var sb = (length <= 512
                     ? stackalloc char[512]
                     : (chars = ArrayPool<char>.Shared.Rent(length))).Slice(0, length);
-            if (_sign < 0)
-            {
-                sb[0] = '-';
-                if (!TryFormat(sb[1..], out var charsWritten))
-                    throw new FormatException();
+            if(!TryFormat(sb, out int charsWritten))
+                throw new FormatException();
 
-                return new string(sb[..++charsWritten]);
-            }
-            else
-            {
-                if (!TryFormat(sb, out var charsWritten))
-                    throw new FormatException();
-
-                return new string(sb[..charsWritten]);
-            }
+            return new string(sb[..charsWritten]);
         }
 
         public string ToString(IFormatProvider? provider)
@@ -743,16 +732,34 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             {
                 return _sign.TryFormat(destination, out charsWritten);
             }
-
-            if (!_dig[^1].TryFormat(destination, out charsWritten))
-                throw new FormatException();
-
-            destination = destination[charsWritten..];
+            Span<char> firstBuffer = stackalloc char[20];
+            if (!_dig[^1].TryFormat(firstBuffer, out var first))
+            {
+                charsWritten = 0;
+                return false;
+            }
+            firstBuffer = firstBuffer[..first];
             var digits = _dig[..^1];
+            charsWritten = first + digits.Length * BigIntegerCalculator.BaseLog + (_sign < 0 ? 1 : 0);
+            if (destination.Length < charsWritten)
+            {
+                charsWritten = 0;
+                return false;
+            }
+            destination = destination[..charsWritten];
+
+            if (_sign < 0)
+            {
+                destination[0] = '-';
+                destination = destination[1..];
+            }
+
+            firstBuffer.CopyTo(destination);
+            destination = destination[first..];
+
             for (int i = digits.Length - 1; i >= 0; i--)
             {
                 digits[i].TryFormat(destination, out _, "D18");
-                charsWritten += BigIntegerCalculator.BaseLog;
                 destination = destination[BigIntegerCalculator.BaseLog..];
             }
 
