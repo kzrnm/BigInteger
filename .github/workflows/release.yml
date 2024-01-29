@@ -1,6 +1,8 @@
 name: Release
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 env:
@@ -80,8 +82,10 @@ jobs:
         with:
           name: dist
           path: Package
+
   publish:
     needs: [get-version, verify, build]
+    if: ${{ needs.get-version.outputs.is-new == 'true' }}
     uses: kzrnm/dotnet-actions/.github/workflows/publish.yml@v2
     with:
       artifact-name: dist
