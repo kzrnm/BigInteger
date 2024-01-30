@@ -116,35 +116,7 @@ namespace Kzrnm.Numerics.Decimal
         public static ulong DivRem(ulong hi, ulong lo, ulong d, out ulong rem)
         {
             Debug.Assert(hi < d);
-            ulong q;
-            if (hi == 0)
-            {
-                (q, rem) = Math.DivRem(lo, d);
-                return q;
-            }
-            // To 64 bits
-            hi = Math.BigMul(hi, Base, out var hilo2);
-            lo += hilo2;
-            if (lo < hilo2)
-                ++hi;
 
-            return DivRem64(hi, lo, d, out rem);
-        }
-
-        [MethodImpl(256)]
-        public static UInt128 DivRem128(ulong hi, ulong lo, ulong d, out ulong rem)
-        {
-            if (hi < d)
-                return new(0, DivRem64(hi, lo, d, out rem));
-
-            var qhi = DivRem64(0, hi, d, out var r);
-            return new UInt128(qhi, DivRem64(r, lo, d, out rem));
-        }
-
-        [MethodImpl(256)]
-        public static ulong DivRem64(ulong hi, ulong lo, ulong d, out ulong rem)
-        {
-            Debug.Assert(hi < d);
             ulong q;
             if (hi == 0)
             {
@@ -152,46 +124,43 @@ namespace Kzrnm.Numerics.Decimal
                 return q;
             }
 
-            int shift = BitOperations.LeadingZeroCount(d);
-            if (shift != 0)
+            ulong mul = Base / (d + 1);
+            if (mul > 1)
             {
-                int backShift = 64 - shift;
-                d <<= shift;
-                hi = (hi << shift) | (lo >> backShift);
-                lo <<= shift;
+                d *= mul;
+                hi *= mul;
+                hi += BigMul(lo, mul, out lo);
             }
 
-            var lohi = lo >> 32;
-            var lolo = (uint)lo;
+            var (lohi, lolo) = Math.DivRem(lo, BaseSqrt);
 
-            q = D3n2n(hi, lohi, d, out ulong r1) << 32;
-            q |= D3n2n(r1, lolo, d, out rem);
-            if (shift != 0)
-                rem >>= shift;
+            q = D3n2n(hi, lohi, d, out ulong r1) * BaseSqrt;
+            q += D3n2n(r1, lolo, d, out rem);
+            if (mul > 1)
+                rem /= mul;
             return q;
+
 
             [MethodImpl(256)]
             static ulong D3n2n(ulong a12, ulong a3, ulong b, out ulong rem)
             {
-                var b1 = b >> 32;
-                var b2 = (uint)b;
+                var (b1, b2) = Math.DivRem(b, BaseSqrt);
+                Debug.Assert(a12 < Base);
+                Debug.Assert(a3 < BaseSqrt);
+                Debug.Assert(b < Base);
+
                 ulong quo;
                 (quo, rem) = Math.DivRem(a12, b1);
                 var d = quo * b2;
 
-                var hi = 0ul;
-                rem <<= 32;
-
+                rem *= BaseSqrt;
                 rem += a3;
-                if (rem < a3) ++hi;
-                if (rem < d) --hi;
-                rem -= d;
-                while (hi != 0)
+                while (rem < d)
                 {
-                    --quo;
                     rem += b;
-                    if (rem < b) ++hi;
+                    --quo;
                 }
+                rem -= d;
 
                 return quo;
             }
