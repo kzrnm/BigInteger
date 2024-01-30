@@ -113,28 +113,6 @@ namespace Kzrnm.Numerics.Decimal
         }
 
         [MethodImpl(256)]
-        public static ulong DivRemBase(ulong v, out ulong remainder)
-        {
-            var q = v / Base;
-            remainder = v - q * Base;
-            return q;
-        }
-        [MethodImpl(256)]
-        public static long DivRemBase(long v, out ulong remainder)
-        {
-            const long B = (long)Base;
-            var q = v / B;
-            var rem = v - q * B;
-            if (rem < 0)
-            {
-                rem += B;
-                --q;
-            }
-            remainder = (ulong)rem;
-            return q;
-        }
-
-        [MethodImpl(256)]
         public static ulong DivRem(ulong hi, ulong lo, ulong d, out ulong rem)
         {
             Debug.Assert(hi < d);
@@ -267,6 +245,22 @@ namespace Kzrnm.Numerics.Decimal
                 return 1;
             }
             return 0;
+        }
+
+        [MethodImpl(256)]
+        public static long DivRemBase(long v, out ulong remainder)
+        {
+            const long B = (long)Base;
+            var q = v / B;
+            var rem = v - q * B;
+
+            if (rem < 0)
+            {
+                rem += B;
+                --q;
+            }
+            remainder = (ulong)rem;
+            return q;
         }
     }
 }

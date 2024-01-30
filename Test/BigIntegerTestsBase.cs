@@ -25,19 +25,28 @@ namespace Kzrnm.Numerics.Test
             yield return new BigIntegerData("4149515568880992958512407863691161151012446232242436899995657329690652811412908146399707048947103794288197886611300789182395151075411775307886874834113963687061181803401509523685376", "4149515568880992958512407863691161151012446232242436899995657329690652811412908146399707048947103794288197886611300789182395151075411775307886874834113963687061181803401507376201728");
             yield return new BigIntegerData("3254524275368499316718987238542010791047407685861758100326628572335879727", "831130247779490037441982534999103126");
 
-            foreach (var sign in new[] { "", "-" })
+
+            var nums = new[]
             {
-                yield return new BigIntegerData($"{sign}{int.MaxValue}", "1");
-                yield return new BigIntegerData("1", $"{sign}{int.MaxValue}");
-                yield return new BigIntegerData($"{sign}{int.MaxValue}", "-1");
-                yield return new BigIntegerData("-1", $"{sign}{int.MaxValue}");
-            }
-            {
-                yield return new BigIntegerData($"{int.MinValue}", "1");
-                yield return new BigIntegerData("1", $"{int.MinValue}");
-                yield return new BigIntegerData($"{int.MinValue}", "-1");
-                yield return new BigIntegerData("-1", $"{int.MinValue}");
-            }
+                "1",
+                $"{int.MaxValue}",
+                $"{int.MaxValue + 1L}",
+                $"{uint.MaxValue}",
+                $"{uint.MaxValue+1UL}",
+                $"{long.MaxValue}",
+                $"{long.MaxValue+1UL}",
+                $"{ulong.MaxValue}",
+                $"{new UInt128(1,0)}",
+                $"{Int128.MaxValue}",
+                $"{(UInt128)Int128.MaxValue + 1}",
+                $"{1+(OrigBigInteger)UInt128.MaxValue}",
+            };
+
+            foreach (var sign1 in new[] { "", "+", "-" })
+                foreach (var sign2 in new[] { "", "+", "-" })
+                    foreach (var num1 in nums)
+                        foreach (var num2 in nums)
+                            yield return new BigIntegerData($"{sign1}{num1}", $"{sign2}{num2}");
 
             for (int i = 6; i < 8; i++)
             {
@@ -214,7 +223,6 @@ namespace Kzrnm.Numerics.Test
         public static void Equal(T actual, OrigBigInteger expected)
         {
             Impl();
-            [DebuggerStepThrough]
             void Impl()
             {
 #if NET8_0_OR_GREATER

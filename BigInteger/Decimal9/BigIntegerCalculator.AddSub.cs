@@ -6,18 +6,18 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
-namespace Kzrnm.Numerics.Decimal
+namespace Kzrnm.Numerics.Decimal9
 {
     internal static partial class BigIntegerCalculator
     {
         private const int CopyToThreshold = 8;
 
-        private static void CopyTail(ReadOnlySpan<ulong> source, Span<ulong> dest, int start)
+        private static void CopyTail(ReadOnlySpan<uint> source, Span<uint> dest, int start)
         {
             source.Slice(start).CopyTo(dest.Slice(start));
         }
 
-        public static void Add(ReadOnlySpan<ulong> left, ulong right, Span<ulong> bits)
+        public static void Add(ReadOnlySpan<uint> left, uint right, Span<uint> bits)
         {
             Debug.Assert(left.Length >= 1);
             Debug.Assert(bits.Length == left.Length + 1);
@@ -26,7 +26,7 @@ namespace Kzrnm.Numerics.Decimal
             Add(left, bits, ref MemoryMarshal.GetReference(bits), startIndex: 0, initialCarry: right);
         }
 
-        public static void Add(ReadOnlySpan<ulong> left, ReadOnlySpan<ulong> right, Span<ulong> bits)
+        public static void Add(ReadOnlySpan<uint> left, ReadOnlySpan<uint> right, Span<uint> bits)
         {
             Debug.Assert(right.Length >= 1);
             Debug.Assert(left.Length >= right.Length);
@@ -34,12 +34,12 @@ namespace Kzrnm.Numerics.Decimal
 
             // Switching to managed references helps eliminating
             // index bounds check for all buffers.
-            ref ulong resultPtr = ref MemoryMarshal.GetReference(bits);
-            ref ulong rightPtr = ref MemoryMarshal.GetReference(right);
-            ref ulong leftPtr = ref MemoryMarshal.GetReference(left);
+            ref uint resultPtr = ref MemoryMarshal.GetReference(bits);
+            ref uint rightPtr = ref MemoryMarshal.GetReference(right);
+            ref uint leftPtr = ref MemoryMarshal.GetReference(left);
 
             int i = 0;
-            ulong carry = 0;
+            uint carry = 0;
 
             // Executes the "grammar-school" algorithm for computing z = a + b.
             // While calculating z_i = a_i + b_i we take care of overflow:
@@ -49,25 +49,29 @@ namespace Kzrnm.Numerics.Decimal
             do
             {
                 ref var result = ref Unsafe.Add(ref resultPtr, i);
-                result = carry;
-                carry = SafeAdd(ref result, Unsafe.Add(ref leftPtr, i));
-                carry += SafeAdd(ref result, Unsafe.Add(ref rightPtr, i));
+                result = carry + Unsafe.Add(ref leftPtr, i) + Unsafe.Add(ref rightPtr, i);
+                carry = 0;
+                while (result >= Base)
+                {
+                    ++carry;
+                    result -= Base;
+                }
                 i++;
             } while (i < right.Length);
 
             Add(left, bits, ref resultPtr, startIndex: i, initialCarry: carry);
         }
 
-        private static void AddSelf(Span<ulong> left, ReadOnlySpan<ulong> right)
+        private static void AddSelf(Span<uint> left, ReadOnlySpan<uint> right)
         {
             Debug.Assert(left.Length >= right.Length);
 
             int i = 0;
-            ulong carry = 0L;
+            uint carry = 0;
 
             // Switching to managed references helps eliminating
             // index bounds check...
-            ref ulong leftPtr = ref MemoryMarshal.GetReference(left);
+            ref var leftPtr = ref MemoryMarshal.GetReference(left);
 
             // Executes the "grammar-school" algorithm for computing z = a + b.
             // Same as above, but we're writing the result directly to a and
@@ -76,29 +80,38 @@ namespace Kzrnm.Numerics.Decimal
             for (; i < right.Length; i++)
             {
                 ref var result = ref Unsafe.Add(ref leftPtr, i);
-                carry = SafeAdd(ref result, carry);
-                carry += SafeAdd(ref result, right[i]);
+                result += carry + right[i];
+                carry = 0;
+                while (result >= Base)
+                {
+                    ++carry;
+                    result -= Base;
+                }
             }
             for (; carry != 0 && i < left.Length; i++)
             {
                 ref var result = ref left[i];
-                carry = SafeAdd(ref result, carry);
+                result += carry;
+                if (result >= Base)
+                    carry = 1;
+                else
+                    carry = 0;
             }
 
             Debug.Assert(carry == 0);
         }
 
-        public static void Subtract(ReadOnlySpan<ulong> left, ulong right, Span<ulong> bits)
+        public static void Subtract(ReadOnlySpan<uint> left, uint right, Span<uint> bits)
         {
             Debug.Assert(left.Length >= 1);
             Debug.Assert(left[0] >= right || left.Length >= 2);
             Debug.Assert(bits.Length == left.Length);
             Debug.Assert(right < Base);
 
-            Subtract(left, bits, ref Unsafe.As<ulong, long>(ref MemoryMarshal.GetReference(bits)), startIndex: 0, initialCarry: -(long)right);
+            Subtract(left, bits, ref Unsafe.As<uint, int>(ref MemoryMarshal.GetReference(bits)), startIndex: 0, initialCarry: -(int)right);
         }
 
-        public static void Subtract(ReadOnlySpan<ulong> left, ReadOnlySpan<ulong> right, Span<ulong> bits)
+        public static void Subtract(ReadOnlySpan<uint> left, ReadOnlySpan<uint> right, Span<uint> bits)
         {
             Debug.Assert(right.Length >= 1);
             Debug.Assert(left.Length >= right.Length);
@@ -107,12 +120,12 @@ namespace Kzrnm.Numerics.Decimal
 
             // Switching to managed references helps eliminating
             // index bounds check for all buffers.
-            ref long resultPtr = ref Unsafe.As<ulong, long>(ref MemoryMarshal.GetReference(bits));
-            ref long rightPtr = ref Unsafe.As<ulong, long>(ref MemoryMarshal.GetReference(right));
-            ref long leftPtr = ref Unsafe.As<ulong, long>(ref MemoryMarshal.GetReference(left));
+            ref var resultPtr = ref Unsafe.As<uint, int>(ref MemoryMarshal.GetReference(bits));
+            ref var rightPtr = ref Unsafe.As<uint, int>(ref MemoryMarshal.GetReference(right));
+            ref var leftPtr = ref Unsafe.As<uint, int>(ref MemoryMarshal.GetReference(left));
 
             int i = 0;
-            long carry = 0;
+            int carry = 0;
 
             // Executes the "grammar-school" algorithm for computing z = a + b.
             // While calculating z_i = a_i + b_i we take care of overflow:
@@ -122,14 +135,12 @@ namespace Kzrnm.Numerics.Decimal
             do
             {
                 ref var result = ref Unsafe.Add(ref resultPtr, i);
-                result = carry;
-                result += Unsafe.Add(ref leftPtr, i);
+                result = carry + Unsafe.Add(ref leftPtr, i) - Unsafe.Add(ref rightPtr, i);
                 carry = 0;
-                result -= Unsafe.Add(ref rightPtr, i);
                 while (result < 0)
                 {
                     --carry;
-                    result += (long)Base;
+                    result += Base;
                 }
 
                 i++;
@@ -138,18 +149,18 @@ namespace Kzrnm.Numerics.Decimal
             Subtract(left, bits, ref resultPtr, startIndex: i, initialCarry: carry);
         }
 
-        private static void SubtractSelf(Span<ulong> left, ReadOnlySpan<ulong> right)
+        private static void SubtractSelf(Span<uint> left, ReadOnlySpan<uint> right)
         {
             Debug.Assert(left.Length >= right.Length);
             Debug.Assert(CompareActual(left, right) >= 0);
 
             int i = 0;
-            long carry = 0;
+            int carry = 0;
 
             // Switching to managed references helps eliminating
             // index bounds check...
-            ref long rightPtr = ref Unsafe.As<ulong, long>(ref MemoryMarshal.GetReference(right));
-            ref long leftPtr = ref Unsafe.As<ulong, long>(ref MemoryMarshal.GetReference(left));
+            ref int rightPtr = ref Unsafe.As<uint, int>(ref MemoryMarshal.GetReference(right));
+            ref int leftPtr = ref Unsafe.As<uint, int>(ref MemoryMarshal.GetReference(left));
 
             // Executes the "grammar-school" algorithm for computing z = a - b.
             // Same as above, but we're writing the result directly to a and
@@ -158,14 +169,12 @@ namespace Kzrnm.Numerics.Decimal
             for (; i < right.Length; i++)
             {
                 ref var result = ref Unsafe.Add(ref leftPtr, i);
-                result += carry;
-
+                result += carry - Unsafe.Add(ref rightPtr, i);
                 carry = 0;
-                result -= Unsafe.Add(ref rightPtr, i);
                 while (result < 0)
                 {
                     --carry;
-                    result += (long)Base;
+                    result += Base;
                 }
             }
             for (; carry != 0 && i < left.Length; i++)
@@ -176,7 +185,7 @@ namespace Kzrnm.Numerics.Decimal
                 while (result < 0)
                 {
                     --carry;
-                    result += (long)Base;
+                    result += Base;
                 }
             }
 
@@ -184,22 +193,27 @@ namespace Kzrnm.Numerics.Decimal
         }
 
         [MethodImpl(256)]
-        private static void Add(ReadOnlySpan<ulong> left, Span<ulong> bits, ref ulong resultPtr, int startIndex, ulong initialCarry)
+        private static void Add(ReadOnlySpan<uint> left, Span<uint> bits, ref uint resultPtr, int startIndex, uint initialCarry)
         {
             // Executes the addition for one big and one 32-bit integer.
             // Thus, we've similar code than below, but there is no loop for
             // processing the 32-bit integer, since it's a single element.
 
             int i = startIndex;
-            ulong carry = initialCarry;
+            uint carry = initialCarry;
 
             if (left.Length <= CopyToThreshold)
             {
                 for (; i < left.Length; i++)
                 {
                     ref var result = ref Unsafe.Add(ref resultPtr, i);
-                    result = left[i];
-                    carry = SafeAdd(ref result, carry);
+                    result = left[i] + carry;
+                    carry = 0;
+                    if (result >= Base)
+                    {
+                        ++carry;
+                        result -= Base;
+                    }
                 }
                 Unsafe.Add(ref resultPtr, left.Length) = carry;
                 Debug.Assert(carry < Base);
@@ -209,8 +223,13 @@ namespace Kzrnm.Numerics.Decimal
                 for (; i < left.Length;)
                 {
                     ref var result = ref Unsafe.Add(ref resultPtr, i);
-                    result = left[i];
-                    carry = SafeAdd(ref result, carry);
+                    result = left[i] + carry;
+                    carry = 0;
+                    if (result >= Base)
+                    {
+                        ++carry;
+                        result -= Base;
+                    }
                     i++;
 
                     // Once carry is set to 0 it can not be 1 anymore.
@@ -230,27 +249,27 @@ namespace Kzrnm.Numerics.Decimal
         }
 
         [MethodImpl(256)]
-        private static void Subtract(ReadOnlySpan<ulong> left, Span<ulong> bits, ref long resultPtr, int startIndex, long initialCarry)
+        private static void Subtract(ReadOnlySpan<uint> left, Span<uint> bits, ref int resultPtr, int startIndex, int initialCarry)
         {
             // Executes the addition for one big and one 32-bit integer.
             // Thus, we've similar code than below, but there is no loop for
             // processing the 32-bit integer, since it's a single element.
 
             int i = startIndex;
-            long carry = initialCarry;
+            int carry = initialCarry;
 
             if (left.Length <= CopyToThreshold)
             {
                 for (; i < left.Length; i++)
                 {
                     ref var result = ref Unsafe.Add(ref resultPtr, i);
-                    result += carry + (long)left[i];
+                    result += carry + (int)left[i];
 
                     carry = 0;
                     while (result < 0)
                     {
                         --carry;
-                        result += (long)Base;
+                        result += Base;
                     }
                 }
             }
@@ -259,13 +278,13 @@ namespace Kzrnm.Numerics.Decimal
                 for (; i < left.Length;)
                 {
                     ref var result = ref Unsafe.Add(ref resultPtr, i);
-                    result += carry + (long)left[i];
+                    result += carry + (int)left[i];
 
                     carry = 0;
                     while (result < 0)
                     {
                         --carry;
-                        result += (long)Base;
+                        result += Base;
                     }
                     i++;
 

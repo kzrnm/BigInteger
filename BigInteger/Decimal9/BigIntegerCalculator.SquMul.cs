@@ -2,12 +2,11 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
-using System.Buffers;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
-namespace Kzrnm.Numerics.Decimal
+namespace Kzrnm.Numerics.Decimal9
 {
     internal static partial class BigIntegerCalculator
     {
@@ -19,7 +18,7 @@ namespace Kzrnm.Numerics.Decimal
 #endif
         int SquareThreshold = 32;
 
-        public static void Square(ReadOnlySpan<ulong> value, Span<ulong> bits)
+        public static void Square(ReadOnlySpan<uint> value, Span<uint> bits)
         {
             Debug.Assert(bits.Length == value.Length + value.Length);
 
@@ -36,7 +35,7 @@ namespace Kzrnm.Numerics.Decimal
             {
                 // Switching to managed references helps eliminating
                 // index bounds check...
-                ref ulong resultPtr = ref MemoryMarshal.GetReference(bits);
+                ref var resultPtr = ref MemoryMarshal.GetReference(bits);
 
                 // Squares the bits using the "grammar-school" method.
                 // Envisioning the "rhombus" of a pen-and-paper calculation
@@ -51,23 +50,22 @@ namespace Kzrnm.Numerics.Decimal
                 // operation and do some extra shifts.
                 for (int i = 0; i < value.Length; i++)
                 {
-                    ulong carry = 0;
-                    ulong v = value[i];
+                    ulong carry = 0UL;
+                    uint v = value[i];
                     for (int j = 0; j < i; j++)
                     {
-                        ref var elementPtr = ref Unsafe.Add(ref resultPtr, i + j);
+                        ulong digit = Unsafe.Add(ref resultPtr, i + j) + carry + ((ulong)value[j] * v * 2);
+                        Debug.Assert(digit < (ulong)Base * Base);
 
-                        var hi1 = SafeAdd(ref elementPtr, carry);
-                        var hi2 = BigMul(value[j], v, out var lo2);
+                        var (q, rem) = Math.DivRem(digit, Base);
 
-                        hi2 <<= 1;
-                        hi2 += SafeAdd(ref lo2, lo2);
-
-                        carry = hi1 + hi2 + SafeAdd(ref elementPtr, lo2);
+                        Unsafe.Add(ref resultPtr, i + j) = (uint)rem;
+                        carry = (uint)q;
                     }
                     {
-                        Unsafe.Add(ref resultPtr, i + i + 1) = BigMulAdd(v, v, carry, out var lo);
-                        Unsafe.Add(ref resultPtr, i + i) = lo;
+                        var (q, rem) = Math.DivRem((ulong)v * v + carry, Base);
+                        Unsafe.Add(ref resultPtr, i + i) = (uint)rem;
+                        Unsafe.Add(ref resultPtr, i + i + 1) = (uint)q;
                     }
                 }
             }
@@ -89,12 +87,12 @@ namespace Kzrnm.Numerics.Decimal
                 int n2 = n << 1;
 
                 // ... split value like a = (a_1 << n) + a_0
-                ReadOnlySpan<ulong> valueLow = value.Slice(0, n);
-                ReadOnlySpan<ulong> valueHigh = value.Slice(n);
+                ReadOnlySpan<uint> valueLow = value.Slice(0, n);
+                ReadOnlySpan<uint> valueHigh = value.Slice(n);
 
                 // ... prepare our result array (to reuse its memory)
-                Span<ulong> bitsLow = bits.Slice(0, n2);
-                Span<ulong> bitsHigh = bits.Slice(n2);
+                Span<uint> bitsLow = bits.Slice(0, n2);
+                Span<uint> bitsHigh = bits.Slice(n2);
 
                 // ... compute z_0 = a_0 * a_0 (squaring again!)
                 Square(valueLow, bitsLow);
@@ -103,17 +101,17 @@ namespace Kzrnm.Numerics.Decimal
                 Square(valueHigh, bitsHigh);
 
                 int foldLength = valueHigh.Length + 1;
-                ulong[]? foldFromPool = null;
-                Span<ulong> fold = ((uint)foldLength <= StackAllocThreshold ?
-                                  stackalloc ulong[StackAllocThreshold]
-                                  : foldFromPool = ArrayPool<ulong>.Shared.Rent(foldLength)).Slice(0, foldLength);
+                uint[]? foldFromPool = null;
+                Span<uint> fold = ((uint)foldLength <= StackAllocThreshold ?
+                                  stackalloc uint[StackAllocThreshold]
+                                  : foldFromPool = ArrayPool<uint>.Shared.Rent(foldLength)).Slice(0, foldLength);
                 fold.Clear();
 
                 int coreLength = foldLength + foldLength;
-                ulong[]? coreFromPool = null;
-                Span<ulong> core = ((uint)coreLength <= StackAllocThreshold ?
-                                  stackalloc ulong[StackAllocThreshold]
-                                  : coreFromPool = ArrayPool<ulong>.Shared.Rent(coreLength)).Slice(0, coreLength);
+                uint[]? coreFromPool = null;
+                Span<uint> core = ((uint)coreLength <= StackAllocThreshold ?
+                                  stackalloc uint[StackAllocThreshold]
+                                  : coreFromPool = ArrayPool<uint>.Shared.Rent(coreLength)).Slice(0, coreLength);
                 core.Clear();
 
                 // ... compute z_a = a_1 + a_0 (call it fold...)
@@ -123,7 +121,7 @@ namespace Kzrnm.Numerics.Decimal
                 Square(fold, core);
 
                 if (foldFromPool != null)
-                    ArrayPool<ulong>.Shared.Return(foldFromPool);
+                    ArrayPool<uint>.Shared.Return(foldFromPool);
 
                 SubtractCore(bitsHigh, bitsLow, core);
 
@@ -131,11 +129,11 @@ namespace Kzrnm.Numerics.Decimal
                 AddSelf(bits.Slice(n), core);
 
                 if (coreFromPool != null)
-                    ArrayPool<ulong>.Shared.Return(coreFromPool);
+                    ArrayPool<uint>.Shared.Return(coreFromPool);
             }
         }
 
-        public static void Multiply(ReadOnlySpan<ulong> left, ulong right, Span<ulong> bits)
+        public static void Multiply(ReadOnlySpan<uint> left, uint right, Span<uint> bits)
         {
             Debug.Assert(bits.Length == left.Length + 1);
 
@@ -149,9 +147,11 @@ namespace Kzrnm.Numerics.Decimal
 
             for (; i < left.Length; i++)
             {
-                carry = BigMulAdd(left[i], right, carry, out bits[i]);
+                var (q, rem) = Math.DivRem((ulong)left[i] * right + carry, Base);
+                carry = q;
+                bits[i] = (uint)rem;
             }
-            bits[i] = carry;
+            bits[i] = (uint)carry;
         }
 
 #if DEBUG
@@ -162,7 +162,7 @@ namespace Kzrnm.Numerics.Decimal
 #endif
         int MultiplyThreshold = 32;
 
-        public static void Multiply(ReadOnlySpan<ulong> left, ReadOnlySpan<ulong> right, Span<ulong> bits)
+        public static void Multiply(ReadOnlySpan<uint> left, ReadOnlySpan<uint> right, Span<uint> bits)
         {
             Debug.Assert(left.Length >= right.Length);
             Debug.Assert(bits.Length >= left.Length + right.Length);
@@ -178,7 +178,7 @@ namespace Kzrnm.Numerics.Decimal
             }
         }
 
-        private static void MultiplyFarLength(ReadOnlySpan<ulong> left, ReadOnlySpan<ulong> right, Span<ulong> bits)
+        private static void MultiplyFarLength(ReadOnlySpan<uint> left, ReadOnlySpan<uint> right, Span<uint> bits)
         {
             Debug.Assert(left.Length - right.Length >= 3);
             Debug.Assert(bits.Length >= left.Length + right.Length);
@@ -215,12 +215,12 @@ namespace Kzrnm.Numerics.Decimal
                 if (right.Length <= n + 1)
                 {
                     // ... split left like a = (a_1 << n) + a_0
-                    ReadOnlySpan<ulong> leftLow = left.Slice(0, n);
-                    ReadOnlySpan<ulong> leftHigh = left.Slice(n);
+                    ReadOnlySpan<uint> leftLow = left.Slice(0, n);
+                    ReadOnlySpan<uint> leftHigh = left.Slice(n);
 
                     // ... split right like b = (b_1 << n) + b_0
-                    ReadOnlySpan<ulong> rightLow;
-                    ulong rightHigh;
+                    ReadOnlySpan<uint> rightLow;
+                    uint rightHigh;
                     if (n < right.Length)
                     {
                         Debug.Assert(right.Length == n + 1);
@@ -234,18 +234,18 @@ namespace Kzrnm.Numerics.Decimal
                     }
 
                     // ... prepare our result array (to reuse its memory)
-                    Span<ulong> bitsLow = bits.Slice(0, n + rightLow.Length);
-                    Span<ulong> bitsHigh = bits.Slice(n);
+                    Span<uint> bitsLow = bits.Slice(0, n + rightLow.Length);
+                    Span<uint> bitsHigh = bits.Slice(n);
 
                     int carryLength = rightLow.Length;
-                    ulong[]? carryFromPool = null;
-                    Span<ulong> carry = ((uint)carryLength <= StackAllocThreshold ?
-                                      stackalloc ulong[StackAllocThreshold]
-                                      : carryFromPool = ArrayPool<ulong>.Shared.Rent(carryLength)).Slice(0, carryLength);
+                    uint[]? carryFromPool = null;
+                    Span<uint> carry = ((uint)carryLength <= StackAllocThreshold ?
+                                      stackalloc uint[StackAllocThreshold]
+                                      : carryFromPool = ArrayPool<uint>.Shared.Rent(carryLength)).Slice(0, carryLength);
 
                     // ... compute low
                     Multiply(leftLow, rightLow, bitsLow);
-                    Span<ulong> carryOrig = bits.Slice(n, rightLow.Length);
+                    Span<uint> carryOrig = bits.Slice(n, rightLow.Length);
                     carryOrig.CopyTo(carry);
                     carryOrig.Clear();
 
@@ -255,10 +255,10 @@ namespace Kzrnm.Numerics.Decimal
                         MultiplyNearLength(leftHigh, rightLow, bitsHigh.Slice(0, leftHigh.Length + n));
 
                         int upperRightLength = left.Length + 1;
-                        ulong[]? upperRightFromPool = null;
-                        Span<ulong> upperRight = ((uint)upperRightLength <= StackAllocThreshold ?
-                                          stackalloc ulong[StackAllocThreshold]
-                                          : upperRightFromPool = ArrayPool<ulong>.Shared.Rent(upperRightLength)).Slice(0, upperRightLength);
+                        uint[]? upperRightFromPool = null;
+                        Span<uint> upperRight = ((uint)upperRightLength <= StackAllocThreshold ?
+                                          stackalloc uint[StackAllocThreshold]
+                                          : upperRightFromPool = ArrayPool<uint>.Shared.Rent(upperRightLength)).Slice(0, upperRightLength);
                         upperRight.Clear();
 
                         Multiply(left, rightHigh, upperRight);
@@ -266,7 +266,7 @@ namespace Kzrnm.Numerics.Decimal
                         AddSelf(bitsHigh, upperRight);
 
                         if (upperRightFromPool != null)
-                            ArrayPool<ulong>.Shared.Return(upperRightFromPool);
+                            ArrayPool<uint>.Shared.Return(upperRightFromPool);
                     }
                     else
                     {
@@ -277,7 +277,7 @@ namespace Kzrnm.Numerics.Decimal
                     AddSelf(bitsHigh, carry);
 
                     if (carryFromPool != null)
-                        ArrayPool<ulong>.Shared.Return(carryFromPool);
+                        ArrayPool<uint>.Shared.Return(carryFromPool);
                 }
                 else
                 {
@@ -286,16 +286,16 @@ namespace Kzrnm.Numerics.Decimal
                     Debug.Assert(left.Length > right.Length);
 
                     // ... split left like a = (a_1 << n) + a_0
-                    ReadOnlySpan<ulong> leftLow = left.Slice(0, n);
-                    ReadOnlySpan<ulong> leftHigh = left.Slice(n);
+                    ReadOnlySpan<uint> leftLow = left.Slice(0, n);
+                    ReadOnlySpan<uint> leftHigh = left.Slice(n);
 
                     // ... split right like b = (b_1 << n) + b_0
-                    ReadOnlySpan<ulong> rightLow = right.Slice(0, n);
-                    ReadOnlySpan<ulong> rightHigh = right.Slice(n);
+                    ReadOnlySpan<uint> rightLow = right.Slice(0, n);
+                    ReadOnlySpan<uint> rightHigh = right.Slice(n);
 
                     // ... prepare our result array (to reuse its memory)
-                    Span<ulong> bitsLow = bits.Slice(0, n2);
-                    Span<ulong> bitsHigh = bits.Slice(n2);
+                    Span<uint> bitsLow = bits.Slice(0, n2);
+                    Span<uint> bitsHigh = bits.Slice(n2);
 
                     // ... compute z_0 = a_0 * b_0 (multiply again)
                     MultiplyNearLength(rightLow, leftLow, bitsLow);
@@ -304,24 +304,24 @@ namespace Kzrnm.Numerics.Decimal
                     MultiplyFarLength(leftHigh, rightHigh, bitsHigh);
 
                     int leftFoldLength = leftHigh.Length + 1;
-                    ulong[]? leftFoldFromPool = null;
-                    Span<ulong> leftFold = ((uint)leftFoldLength <= StackAllocThreshold ?
-                                          stackalloc ulong[StackAllocThreshold]
-                                          : leftFoldFromPool = ArrayPool<ulong>.Shared.Rent(leftFoldLength)).Slice(0, leftFoldLength);
+                    uint[]? leftFoldFromPool = null;
+                    Span<uint> leftFold = ((uint)leftFoldLength <= StackAllocThreshold ?
+                                          stackalloc uint[StackAllocThreshold]
+                                          : leftFoldFromPool = ArrayPool<uint>.Shared.Rent(leftFoldLength)).Slice(0, leftFoldLength);
                     leftFold.Clear();
 
                     int rightFoldLength = n + 1;
-                    ulong[]? rightFoldFromPool = null;
-                    Span<ulong> rightFold = ((uint)rightFoldLength <= StackAllocThreshold ?
-                                           stackalloc ulong[StackAllocThreshold]
-                                           : rightFoldFromPool = ArrayPool<ulong>.Shared.Rent(rightFoldLength)).Slice(0, rightFoldLength);
+                    uint[]? rightFoldFromPool = null;
+                    Span<uint> rightFold = ((uint)rightFoldLength <= StackAllocThreshold ?
+                                           stackalloc uint[StackAllocThreshold]
+                                           : rightFoldFromPool = ArrayPool<uint>.Shared.Rent(rightFoldLength)).Slice(0, rightFoldLength);
                     rightFold.Clear();
 
                     int coreLength = leftFoldLength + rightFoldLength;
-                    ulong[]? coreFromPool = null;
-                    Span<ulong> core = ((uint)coreLength <= StackAllocThreshold ?
-                                      stackalloc ulong[StackAllocThreshold]
-                                      : coreFromPool = ArrayPool<ulong>.Shared.Rent(coreLength)).Slice(0, coreLength);
+                    uint[]? coreFromPool = null;
+                    Span<uint> core = ((uint)coreLength <= StackAllocThreshold ?
+                                      stackalloc uint[StackAllocThreshold]
+                                      : coreFromPool = ArrayPool<uint>.Shared.Rent(coreLength)).Slice(0, coreLength);
                     core.Clear();
 
                     Debug.Assert(bits.Length - n >= core.Length);
@@ -337,10 +337,10 @@ namespace Kzrnm.Numerics.Decimal
                     MultiplyNearLength(leftFold, rightFold, core);
 
                     if (leftFoldFromPool != null)
-                        ArrayPool<ulong>.Shared.Return(leftFoldFromPool);
+                        ArrayPool<uint>.Shared.Return(leftFoldFromPool);
 
                     if (rightFoldFromPool != null)
-                        ArrayPool<ulong>.Shared.Return(rightFoldFromPool);
+                        ArrayPool<uint>.Shared.Return(rightFoldFromPool);
 
                     SubtractCore(bitsLow, bitsHigh, core);
 
@@ -348,11 +348,11 @@ namespace Kzrnm.Numerics.Decimal
                     AddSelf(bits.Slice(n), core);
 
                     if (coreFromPool != null)
-                        ArrayPool<ulong>.Shared.Return(coreFromPool);
+                        ArrayPool<uint>.Shared.Return(coreFromPool);
                 }
             }
         }
-        private static void MultiplyNearLength(ReadOnlySpan<ulong> left, ReadOnlySpan<ulong> right, Span<ulong> bits)
+        private static void MultiplyNearLength(ReadOnlySpan<uint> left, ReadOnlySpan<uint> right, Span<uint> bits)
         {
             Debug.Assert(left.Length - right.Length < 3);
             Debug.Assert(bits.Length >= left.Length + right.Length);
@@ -389,16 +389,16 @@ namespace Kzrnm.Numerics.Decimal
                 int n2 = n << 1;
 
                 // ... split left like a = (a_1 << n) + a_0
-                ReadOnlySpan<ulong> leftLow = left.Slice(0, n);
-                ReadOnlySpan<ulong> leftHigh = left.Slice(n);
+                ReadOnlySpan<uint> leftLow = left.Slice(0, n);
+                ReadOnlySpan<uint> leftHigh = left.Slice(n);
 
                 // ... split right like b = (b_1 << n) + b_0
-                ReadOnlySpan<ulong> rightLow = right.Slice(0, n);
-                ReadOnlySpan<ulong> rightHigh = right.Slice(n);
+                ReadOnlySpan<uint> rightLow = right.Slice(0, n);
+                ReadOnlySpan<uint> rightHigh = right.Slice(n);
 
                 // ... prepare our result array (to reuse its memory)
-                Span<ulong> bitsLow = bits.Slice(0, n2);
-                Span<ulong> bitsHigh = bits.Slice(n2);
+                Span<uint> bitsLow = bits.Slice(0, n2);
+                Span<uint> bitsHigh = bits.Slice(n2);
 
                 // ... compute z_0 = a_0 * b_0 (multiply again)
                 MultiplyNearLength(leftLow, rightLow, bitsLow);
@@ -407,24 +407,24 @@ namespace Kzrnm.Numerics.Decimal
                 MultiplyNearLength(leftHigh, rightHigh, bitsHigh);
 
                 int leftFoldLength = leftHigh.Length + 1;
-                ulong[]? leftFoldFromPool = null;
-                Span<ulong> leftFold = ((uint)leftFoldLength <= StackAllocThreshold ?
-                                      stackalloc ulong[StackAllocThreshold]
-                                      : leftFoldFromPool = ArrayPool<ulong>.Shared.Rent(leftFoldLength)).Slice(0, leftFoldLength);
+                uint[]? leftFoldFromPool = null;
+                Span<uint> leftFold = ((uint)leftFoldLength <= StackAllocThreshold ?
+                                      stackalloc uint[StackAllocThreshold]
+                                      : leftFoldFromPool = ArrayPool<uint>.Shared.Rent(leftFoldLength)).Slice(0, leftFoldLength);
                 leftFold.Clear();
 
                 int rightFoldLength = rightHigh.Length + 1;
-                ulong[]? rightFoldFromPool = null;
-                Span<ulong> rightFold = ((uint)rightFoldLength <= StackAllocThreshold ?
-                                       stackalloc ulong[StackAllocThreshold]
-                                       : rightFoldFromPool = ArrayPool<ulong>.Shared.Rent(rightFoldLength)).Slice(0, rightFoldLength);
+                uint[]? rightFoldFromPool = null;
+                Span<uint> rightFold = ((uint)rightFoldLength <= StackAllocThreshold ?
+                                       stackalloc uint[StackAllocThreshold]
+                                       : rightFoldFromPool = ArrayPool<uint>.Shared.Rent(rightFoldLength)).Slice(0, rightFoldLength);
                 rightFold.Clear();
 
                 int coreLength = leftFoldLength + rightFoldLength;
-                ulong[]? coreFromPool = null;
-                Span<ulong> core = ((uint)coreLength <= StackAllocThreshold ?
-                                  stackalloc ulong[StackAllocThreshold]
-                                  : coreFromPool = ArrayPool<ulong>.Shared.Rent(coreLength)).Slice(0, coreLength);
+                uint[]? coreFromPool = null;
+                Span<uint> core = ((uint)coreLength <= StackAllocThreshold ?
+                                  stackalloc uint[StackAllocThreshold]
+                                  : coreFromPool = ArrayPool<uint>.Shared.Rent(coreLength)).Slice(0, coreLength);
                 core.Clear();
 
                 // ... compute z_a = a_1 + a_0 (call it fold...)
@@ -437,10 +437,10 @@ namespace Kzrnm.Numerics.Decimal
                 MultiplyNearLength(leftFold, rightFold, core);
 
                 if (leftFoldFromPool != null)
-                    ArrayPool<ulong>.Shared.Return(leftFoldFromPool);
+                    ArrayPool<uint>.Shared.Return(leftFoldFromPool);
 
                 if (rightFoldFromPool != null)
-                    ArrayPool<ulong>.Shared.Return(rightFoldFromPool);
+                    ArrayPool<uint>.Shared.Return(rightFoldFromPool);
 
                 SubtractCore(bitsHigh, bitsLow, core);
 
@@ -448,11 +448,11 @@ namespace Kzrnm.Numerics.Decimal
                 AddSelf(bits.Slice(n), core);
 
                 if (coreFromPool != null)
-                    ArrayPool<ulong>.Shared.Return(coreFromPool);
+                    ArrayPool<uint>.Shared.Return(coreFromPool);
             }
         }
 
-        private static void SubtractCore(ReadOnlySpan<ulong> left, ReadOnlySpan<ulong> right, Span<ulong> core)
+        private static void SubtractCore(ReadOnlySpan<uint> left, ReadOnlySpan<uint> right, Span<uint> core)
         {
             Debug.Assert(left.Length >= right.Length);
             Debug.Assert(core.Length >= left.Length);
@@ -469,35 +469,50 @@ namespace Kzrnm.Numerics.Decimal
 
             // Switching to managed references helps eliminating
             // index bounds check...
-            ref ulong leftPtr = ref MemoryMarshal.GetReference(left);
-            ref ulong corePtr = ref MemoryMarshal.GetReference(core);
+            ref var leftPtr = ref MemoryMarshal.GetReference(left);
+            ref var corePtr = ref MemoryMarshal.GetReference(core);
 
             for (; i < right.Length; i++)
             {
                 long digit = (long)(Unsafe.Add(ref corePtr, i) + (ulong)carry - Unsafe.Add(ref leftPtr, i) - right[i]);
-                carry = DivRemBase(digit, out var rem);
-                Unsafe.Add(ref corePtr, i) = rem;
+                (carry, var rem) = Math.DivRem(digit, Base);
+                if (rem < 0)
+                {
+                    rem += Base;
+                    --carry;
+                }
+                Unsafe.Add(ref corePtr, i) = (uint)rem;
             }
 
             for (; i < left.Length; i++)
             {
                 long digit = (long)(Unsafe.Add(ref corePtr, i) + (ulong)carry - left[i]);
-                carry = DivRemBase(digit, out var rem);
-                Unsafe.Add(ref corePtr, i) = rem;
+                (carry, var rem) = Math.DivRem(digit, Base);
+                if (rem < 0)
+                {
+                    rem += Base;
+                    --carry;
+                }
+                Unsafe.Add(ref corePtr, i) = (uint)rem;
             }
 
             for (; carry != 0 && i < core.Length; i++)
             {
                 long digit = (long)core[i] + carry;
-                carry = DivRemBase(digit, out var rem);
-                core[i] = rem;
+                (carry, var rem) = Math.DivRem(digit, Base);
+                if (rem < 0)
+                {
+                    rem += Base;
+                    --carry;
+                }
+                core[i] = (uint)rem;
             }
         }
-        static void MultiplyNaive(ReadOnlySpan<ulong> left, ReadOnlySpan<ulong> right, Span<ulong> bits)
+        static void MultiplyNaive(ReadOnlySpan<uint> left, ReadOnlySpan<uint> right, Span<uint> bits)
         {
             // Switching to managed references helps eliminating
             // index bounds check...
-            ref ulong resultPtr = ref MemoryMarshal.GetReference(bits);
+            ref var resultPtr = ref MemoryMarshal.GetReference(bits);
 
             // Multiplies the bits using the "grammar-school" method.
             // Envisioning the "rhombus" of a pen-and-paper calculation
@@ -511,15 +526,20 @@ namespace Kzrnm.Numerics.Decimal
                 ulong carry = 0;
                 for (int j = 0; j < left.Length; j++)
                 {
-                    ref ulong elementPtr = ref Unsafe.Add(ref resultPtr, i + j);
-                    carry = BigMulAdd(left[j], right[i], carry, out var lo);
-                    carry += SafeAdd(ref elementPtr, lo);
+                    ref var elementPtr = ref Unsafe.Add(ref resultPtr, i + j);
+                    (carry, var lo) = Math.DivRem((ulong)left[j] * right[i] + carry, Base);
+                    elementPtr += (uint)lo;
+                    if (elementPtr >= Base)
+                    {
+                        ++carry;
+                        elementPtr -= Base;
+                    }
                 }
                 {
                     var q = carry / Base;
                     var rem = carry - q * Base;
                     carry = q;
-                    Unsafe.Add(ref resultPtr, i + left.Length) = rem;
+                    Unsafe.Add(ref resultPtr, i + left.Length) = (uint)rem;
                     Debug.Assert(carry == 0);
                 }
             }
