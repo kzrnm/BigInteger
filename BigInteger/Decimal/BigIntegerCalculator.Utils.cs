@@ -174,15 +174,21 @@ namespace Kzrnm.Numerics.Decimal
         {
             Debug.Assert(a < Base);
             Debug.Assert(b < Base);
-            var (aHi, aLo) = Math.DivRem(a, BaseSqrt);
-            var (bHi, bLo) = Math.DivRem(b, BaseSqrt);
+
+            var aHi = a / BaseSqrt;
+            var aLo = a - aHi * BaseSqrt;
+
+            var bHi = b / BaseSqrt;
+            var bLo = b - bHi * BaseSqrt;
 
             var hi = aHi * bHi;
             low = aLo * bLo;
 
             var mi = aLo * bHi + aHi * bLo;
 
-            var (mh, ml) = Math.DivRem(mi, BaseSqrt);
+            var mh = mi / BaseSqrt;
+            var ml = mi - mh * BaseSqrt;
+
             low += ml * BaseSqrt;
             if (low >= Base)
             {

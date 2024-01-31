@@ -17,7 +17,7 @@ namespace Kzrnm.Numerics.Decimal
 #else
         internal const
 #endif
-        int SquareThreshold = 32;
+        int SquareThreshold = 16;
 
         public static void Square(ReadOnlySpan<ulong> value, Span<ulong> bits)
         {
@@ -160,8 +160,9 @@ namespace Kzrnm.Numerics.Decimal
 #else
         internal const
 #endif
-        int MultiplyThreshold = 32;
+        int MultiplyThreshold = 16;
 
+        [MethodImpl(256)]
         public static void Multiply(ReadOnlySpan<ulong> left, ReadOnlySpan<ulong> right, Span<ulong> bits)
         {
             Debug.Assert(left.Length >= right.Length);
