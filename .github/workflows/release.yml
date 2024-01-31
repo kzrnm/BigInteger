@@ -79,6 +79,9 @@ jobs:
         with:
           name: dist-Release
           path: Package
+      - name: Rename
+        run: ls *-embedded* | xargs -I{} mv {} Debug-{}
+        working-directory: Package
       - uses: actions/upload-artifact@v4
         with:
           name: dist
