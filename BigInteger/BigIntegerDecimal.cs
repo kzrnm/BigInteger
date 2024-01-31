@@ -1,5 +1,4 @@
-﻿using Kzrnm.Numerics.Decimal;
-using System;
+﻿using System;
 using System.Buffers;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
@@ -11,6 +10,7 @@ using System.Runtime.InteropServices;
 
 namespace Kzrnm.Numerics
 {
+    using Decimal;
     [DebuggerDisplay("{DebuggerDisplay,nq}")]
     public struct BigIntegerDecimal
         : IComparable,
@@ -36,35 +36,24 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
 ";
 
         internal readonly int _sign; // Do not rename (binary serialization)
-        internal readonly ulong[]? _dig; // Do not rename (binary serialization)
+        internal readonly uint[]? _dig; // Do not rename (binary serialization)
 
         // We have to make a choice of how to represent int.MinValue. This is the one
         // value that fits in an int, but whose negation does not fit in an int.
         // We choose to use a large representation, so we're symmetric with respect to negation.
-        private static readonly BigIntegerDecimal s_bnMinInt = new BigIntegerDecimal(-1, new ulong[] { unchecked((uint)int.MinValue) });
+        private static readonly BigIntegerDecimal s_bnMinInt = new BigIntegerDecimal(-1, new uint[] { 147483648, 2 });
         private static readonly BigIntegerDecimal s_bnOneInt = new BigIntegerDecimal(1);
         private static readonly BigIntegerDecimal s_bnZeroInt = new BigIntegerDecimal(0);
         private static readonly BigIntegerDecimal s_bnMinusOneInt = new BigIntegerDecimal(-1);
 
-        public BigIntegerDecimal(long value)
+        public BigIntegerDecimal(long value) : this(NumericsHelpers.Abs(value))
         {
-            const long B = (long)BigIntegerCalculator.Base;
-            var uv = NumericsHelpers.Abs(value);
-            if (value <= -B || B <= value)
-            {
-                _sign = Math.Sign(value);
-                _dig = new ulong[2];
-                (_dig[1], _dig[0]) = Math.DivRem(uv, BigIntegerCalculator.Base);
-            }
-            else if (value < -int.MaxValue || int.MaxValue < value)
-            {
-                _sign = Math.Sign(value);
-                _dig = new ulong[] { uv };
-            }
-            else
-            {
-                _sign = (int)value;
-            }
+
+            _sign = _dig != null
+                ? Math.Sign(value)
+                : value < 0
+                   ? -_sign
+                   : _sign;
 
             AssertValid();
         }
@@ -72,26 +61,29 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
         public BigIntegerDecimal(ulong value)
         {
             const ulong B = BigIntegerCalculator.Base;
-            if (B <= value)
+            const ulong B2 = B * B;
+            if (value < B)
             {
-                _sign = 1;
-                _dig = new ulong[2];
-                (_dig[1], _dig[0]) = Math.DivRem(value, B);
+                _sign = (int)value;
             }
-            else if (int.MaxValue < value)
+            else if (value < B2)
             {
                 _sign = 1;
-                _dig = new ulong[] { value };
+                var (q, r1) = Math.DivRem(value, B);
+                _dig = new uint[] { (uint)r1, (uint)q };
             }
             else
             {
-                _sign = (int)value;
+                _sign = 1;
+                var (q, r1) = Math.DivRem(value, B);
+                (q, var r2) = Math.DivRem(q, B);
+                _dig = new uint[] { (uint)r1, (uint)r2, (uint)q };
             }
 
             AssertValid();
         }
 
-        internal BigIntegerDecimal(int n, ulong[]? rgu)
+        internal BigIntegerDecimal(int n, uint[]? rgu)
         {
             if ((rgu is not null) && (rgu.Length > MaxLength))
             {
@@ -110,7 +102,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
         /// </summary>
         /// <param name="value">The absolute value of the number</param>
         /// <param name="negative">The bool indicating the sign of the value.</param>
-        private BigIntegerDecimal(ReadOnlySpan<ulong> value, bool negative)
+        private BigIntegerDecimal(ReadOnlySpan<uint> value, bool negative)
         {
             if (value.Length > MaxLength)
             {
@@ -122,6 +114,10 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             // Try to conserve space as much as possible by checking for wasted leading span entries
             // sometimes the span has leading zeros from bit manipulation operations & and ^
             for (len = value.Length; len > 0 && value[len - 1] == 0; len--) ;
+
+#if NET8_0_OR_GREATER
+            Debug.Assert(!value.ContainsAnyInRange((uint)BigIntegerCalculator.Base, uint.MaxValue));
+#endif
 
             if (len == 0)
             {
@@ -227,10 +223,10 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
 
             const int length = BigIntegerCalculator.BaseLog;
             int di = 0;
-            var digits = new ulong[(value.Length + length - 1) / length];
+            var digits = new uint[(value.Length + length - 1) / length];
             while (value.Length >= length)
             {
-                if (!ulong.TryParse(value[^length..], out var d))
+                if (!uint.TryParse(value[^length..], out var d))
                 {
                     result = default;
                     return false;
@@ -240,7 +236,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             }
             if (value.Length > 0)
             {
-                if (!ulong.TryParse(value, out var d))
+                if (!uint.TryParse(value, out var d))
                 {
                     result = default;
                     return false;
@@ -315,26 +311,26 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
 
             if (trivialDivisor)
             {
-                ulong rest;
+                uint rest;
 
-                ulong[]? digitsFromPool = null;
+                uint[]? digitsFromPool = null;
                 int size = dividend._dig.Length;
-                Span<ulong> quotient = ((uint)size <= BigIntegerCalculator.StackAllocThreshold
-                                    ? stackalloc ulong[BigIntegerCalculator.StackAllocThreshold]
-                                    : digitsFromPool = ArrayPool<ulong>.Shared.Rent(size)).Slice(0, size);
+                Span<uint> quotient = ((uint)size <= BigIntegerCalculator.StackAllocThreshold
+                                    ? stackalloc uint[BigIntegerCalculator.StackAllocThreshold]
+                                    : digitsFromPool = ArrayPool<uint>.Shared.Rent(size)).Slice(0, size);
 
                 try
                 {
                     // may throw DivideByZeroException
                     BigIntegerCalculator.Divide(dividend._dig, NumericsHelpers.Abs(divisor._sign), quotient, out rest);
 
-                    remainder = dividend._sign < 0 ? -1 * (long)rest : rest;
+                    remainder = dividend._sign < 0 ? -rest : rest;
                     return new BigIntegerDecimal(quotient, (dividend._sign < 0) ^ (divisor._sign < 0));
                 }
                 finally
                 {
                     if (digitsFromPool != null)
-                        ArrayPool<ulong>.Shared.Return(digitsFromPool);
+                        ArrayPool<uint>.Shared.Return(digitsFromPool);
                 }
             }
 
@@ -347,17 +343,17 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             }
             else
             {
-                ulong[]? remainderFromPool = null;
+                uint[]? remainderFromPool = null;
                 int size = dividend._dig.Length;
-                Span<ulong> rest = ((uint)size <= BigIntegerCalculator.StackAllocThreshold
-                                ? stackalloc ulong[BigIntegerCalculator.StackAllocThreshold]
-                                : remainderFromPool = ArrayPool<ulong>.Shared.Rent(size)).Slice(0, size);
+                Span<uint> rest = ((uint)size <= BigIntegerCalculator.StackAllocThreshold
+                                ? stackalloc uint[BigIntegerCalculator.StackAllocThreshold]
+                                : remainderFromPool = ArrayPool<uint>.Shared.Rent(size)).Slice(0, size);
 
-                ulong[]? quotientFromPool = null;
+                uint[]? quotientFromPool = null;
                 size = dividend._dig.Length - divisor._dig.Length + 1;
-                Span<ulong> quotient = ((uint)size <= BigIntegerCalculator.StackAllocThreshold
-                                    ? stackalloc ulong[BigIntegerCalculator.StackAllocThreshold]
-                                    : quotientFromPool = ArrayPool<ulong>.Shared.Rent(size)).Slice(0, size);
+                Span<uint> quotient = ((uint)size <= BigIntegerCalculator.StackAllocThreshold
+                                    ? stackalloc uint[BigIntegerCalculator.StackAllocThreshold]
+                                    : quotientFromPool = ArrayPool<uint>.Shared.Rent(size)).Slice(0, size);
 
                 BigIntegerCalculator.Divide(dividend._dig, divisor._dig, quotient, rest);
 
@@ -365,10 +361,10 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
                 var result = new BigIntegerDecimal(quotient, (dividend._sign < 0) ^ (divisor._sign < 0));
 
                 if (remainderFromPool != null)
-                    ArrayPool<ulong>.Shared.Return(remainderFromPool);
+                    ArrayPool<uint>.Shared.Return(remainderFromPool);
 
                 if (quotientFromPool != null)
-                    ArrayPool<ulong>.Shared.Return(quotientFromPool);
+                    ArrayPool<uint>.Shared.Return(quotientFromPool);
 
                 return result;
             }
@@ -425,7 +421,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
         {
             Debug.Assert(BigIntegerCalculator.Compare(leftBits, rightBits) >= 0);
 
-            ulong[]? digitsFromPool = null;
+            uint[]? digitsFromPool = null;
             BigIntegerDecimal result;
 
             // Short circuits to spare some allocations...
@@ -513,7 +509,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             else
             {
                 int size = (modulus._dig?.Length ?? 1) << 1;
-                ulong[]? digitsFromPool = null;
+                uint[]? digitsFromPool = null;
                 Span<ulong> bits = ((uint)size <= BigIntegerCalculator.StackAllocThreshold
                                 ? stackalloc ulong[BigIntegerCalculator.StackAllocThreshold]
                                 : digitsFromPool = ArrayPool<ulong>.Shared.Rent(size)).Slice(0, size);
@@ -569,7 +565,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             bool trivialValue = value._dig == null;
 
             uint power = (uint)NumericsHelpers.Abs(exponent);
-            ulong[]? digitsFromPool = null;
+            uint[]? digitsFromPool = null;
             BigIntegerDecimal result;
 
             if (trivialValue)
@@ -684,7 +680,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             var sb = (length <= 512
                     ? stackalloc char[512]
                     : (chars = ArrayPool<char>.Shared.Rent(length))).Slice(0, length);
-            if(!TryFormat(sb, out int charsWritten))
+            if (!TryFormat(sb, out int charsWritten))
                 throw new FormatException();
 
             return new string(sb[..charsWritten]);
@@ -732,7 +728,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             {
                 return _sign.TryFormat(destination, out charsWritten);
             }
-            Span<char> firstBuffer = stackalloc char[20];
+            Span<char> firstBuffer = stackalloc char[10];
             if (!_dig[^1].TryFormat(firstBuffer, out var first))
             {
                 charsWritten = 0;
@@ -759,14 +755,14 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
 
             for (int i = digits.Length - 1; i >= 0; i--)
             {
-                digits[i].TryFormat(destination, out _, "D18");
+                digits[i].TryFormat(destination, out _, "D9");
                 destination = destination[BigIntegerCalculator.BaseLog..];
             }
 
             return true;
         }
 
-        private static BigIntegerDecimal Add(ReadOnlySpan<ulong> leftBits, int leftSign, ReadOnlySpan<ulong> rightBits, int rightSign)
+        private static BigIntegerDecimal Add(ReadOnlySpan<uint> leftBits, int leftSign, ReadOnlySpan<uint> rightBits, int rightSign)
         {
             bool trivialLeft = leftBits.IsEmpty;
             bool trivialRight = rightBits.IsEmpty;
@@ -774,16 +770,16 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             Debug.Assert(!(trivialLeft && trivialRight), "Trivial cases should be handled on the caller operator");
 
             BigIntegerDecimal result;
-            ulong[]? digitsFromPool = null;
+            uint[]? digitsFromPool = null;
 
             if (trivialLeft)
             {
                 Debug.Assert(!rightBits.IsEmpty);
 
                 int size = rightBits.Length + 1;
-                Span<ulong> bits = ((uint)size <= BigIntegerCalculator.StackAllocThreshold
-                                ? stackalloc ulong[BigIntegerCalculator.StackAllocThreshold]
-                                : digitsFromPool = ArrayPool<ulong>.Shared.Rent(size)).Slice(0, size);
+                Span<uint> bits = ((uint)size <= BigIntegerCalculator.StackAllocThreshold
+                                ? stackalloc uint[BigIntegerCalculator.StackAllocThreshold]
+                                : digitsFromPool = ArrayPool<uint>.Shared.Rent(size)).Slice(0, size);
 
                 BigIntegerCalculator.Add(rightBits, NumericsHelpers.Abs(leftSign), bits);
                 result = new BigIntegerDecimal(bits, leftSign < 0);
@@ -793,9 +789,9 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
                 Debug.Assert(!leftBits.IsEmpty);
 
                 int size = leftBits.Length + 1;
-                Span<ulong> bits = ((uint)size <= BigIntegerCalculator.StackAllocThreshold
-                                ? stackalloc ulong[BigIntegerCalculator.StackAllocThreshold]
-                                : digitsFromPool = ArrayPool<ulong>.Shared.Rent(size)).Slice(0, size);
+                Span<uint> bits = ((uint)size <= BigIntegerCalculator.StackAllocThreshold
+                                ? stackalloc uint[BigIntegerCalculator.StackAllocThreshold]
+                                : digitsFromPool = ArrayPool<uint>.Shared.Rent(size)).Slice(0, size);
 
                 BigIntegerCalculator.Add(leftBits, NumericsHelpers.Abs(rightSign), bits);
                 result = new BigIntegerDecimal(bits, leftSign < 0);
@@ -805,9 +801,9 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
                 Debug.Assert(!leftBits.IsEmpty && !rightBits.IsEmpty);
 
                 int size = rightBits.Length + 1;
-                Span<ulong> bits = ((uint)size <= BigIntegerCalculator.StackAllocThreshold
-                                ? stackalloc ulong[BigIntegerCalculator.StackAllocThreshold]
-                                : digitsFromPool = ArrayPool<ulong>.Shared.Rent(size)).Slice(0, size);
+                Span<uint> bits = ((uint)size <= BigIntegerCalculator.StackAllocThreshold
+                                ? stackalloc uint[BigIntegerCalculator.StackAllocThreshold]
+                                : digitsFromPool = ArrayPool<uint>.Shared.Rent(size)).Slice(0, size);
 
                 BigIntegerCalculator.Add(rightBits, leftBits, bits);
                 result = new BigIntegerDecimal(bits, leftSign < 0);
@@ -817,16 +813,16 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
                 Debug.Assert(!leftBits.IsEmpty && !rightBits.IsEmpty);
 
                 int size = leftBits.Length + 1;
-                Span<ulong> bits = ((uint)size <= BigIntegerCalculator.StackAllocThreshold
-                                ? stackalloc ulong[BigIntegerCalculator.StackAllocThreshold]
-                                : digitsFromPool = ArrayPool<ulong>.Shared.Rent(size)).Slice(0, size);
+                Span<uint> bits = ((uint)size <= BigIntegerCalculator.StackAllocThreshold
+                                ? stackalloc uint[BigIntegerCalculator.StackAllocThreshold]
+                                : digitsFromPool = ArrayPool<uint>.Shared.Rent(size)).Slice(0, size);
 
                 BigIntegerCalculator.Add(leftBits, rightBits, bits);
                 result = new BigIntegerDecimal(bits, leftSign < 0);
             }
 
             if (digitsFromPool != null)
-                ArrayPool<ulong>.Shared.Return(digitsFromPool);
+                ArrayPool<uint>.Shared.Return(digitsFromPool);
 
             return result;
         }
@@ -844,7 +840,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             return Subtract(left._dig, left._sign, right._dig, right._sign);
         }
 
-        private static BigIntegerDecimal Subtract(ReadOnlySpan<ulong> leftBits, int leftSign, ReadOnlySpan<ulong> rightBits, int rightSign)
+        private static BigIntegerDecimal Subtract(ReadOnlySpan<uint> leftBits, int leftSign, ReadOnlySpan<uint> rightBits, int rightSign)
         {
             bool trivialLeft = leftBits.IsEmpty;
             bool trivialRight = rightBits.IsEmpty;
@@ -852,16 +848,16 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             Debug.Assert(!(trivialLeft && trivialRight), "Trivial cases should be handled on the caller operator");
 
             BigIntegerDecimal result;
-            ulong[]? digitsFromPool = null;
+            uint[]? digitsFromPool = null;
 
             if (trivialLeft)
             {
                 Debug.Assert(!rightBits.IsEmpty);
 
                 int size = rightBits.Length;
-                Span<ulong> bits = (size <= BigIntegerCalculator.StackAllocThreshold
-                                ? stackalloc ulong[BigIntegerCalculator.StackAllocThreshold]
-                                : digitsFromPool = ArrayPool<ulong>.Shared.Rent(size)).Slice(0, size);
+                Span<uint> bits = (size <= BigIntegerCalculator.StackAllocThreshold
+                                ? stackalloc uint[BigIntegerCalculator.StackAllocThreshold]
+                                : digitsFromPool = ArrayPool<uint>.Shared.Rent(size)).Slice(0, size);
 
                 BigIntegerCalculator.Subtract(rightBits, NumericsHelpers.Abs(leftSign), bits);
                 result = new BigIntegerDecimal(bits, leftSign >= 0);
@@ -871,9 +867,9 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
                 Debug.Assert(!leftBits.IsEmpty);
 
                 int size = leftBits.Length;
-                Span<ulong> bits = (size <= BigIntegerCalculator.StackAllocThreshold
-                                ? stackalloc ulong[BigIntegerCalculator.StackAllocThreshold]
-                                : digitsFromPool = ArrayPool<ulong>.Shared.Rent(size)).Slice(0, size);
+                Span<uint> bits = (size <= BigIntegerCalculator.StackAllocThreshold
+                                ? stackalloc uint[BigIntegerCalculator.StackAllocThreshold]
+                                : digitsFromPool = ArrayPool<uint>.Shared.Rent(size)).Slice(0, size);
 
                 BigIntegerCalculator.Subtract(leftBits, NumericsHelpers.Abs(rightSign), bits);
                 result = new BigIntegerDecimal(bits, leftSign < 0);
@@ -881,9 +877,9 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             else if (BigIntegerCalculator.Compare(leftBits, rightBits) < 0)
             {
                 int size = rightBits.Length;
-                Span<ulong> bits = (size <= BigIntegerCalculator.StackAllocThreshold
-                                ? stackalloc ulong[BigIntegerCalculator.StackAllocThreshold]
-                                : digitsFromPool = ArrayPool<ulong>.Shared.Rent(size)).Slice(0, size);
+                Span<uint> bits = (size <= BigIntegerCalculator.StackAllocThreshold
+                                ? stackalloc uint[BigIntegerCalculator.StackAllocThreshold]
+                                : digitsFromPool = ArrayPool<uint>.Shared.Rent(size)).Slice(0, size);
 
                 BigIntegerCalculator.Subtract(rightBits, leftBits, bits);
                 result = new BigIntegerDecimal(bits, leftSign >= 0);
@@ -893,16 +889,16 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
                 Debug.Assert(!leftBits.IsEmpty && !rightBits.IsEmpty);
 
                 int size = leftBits.Length;
-                Span<ulong> bits = (size <= BigIntegerCalculator.StackAllocThreshold
-                                ? stackalloc ulong[BigIntegerCalculator.StackAllocThreshold]
-                                : digitsFromPool = ArrayPool<ulong>.Shared.Rent(size)).Slice(0, size);
+                Span<uint> bits = (size <= BigIntegerCalculator.StackAllocThreshold
+                                ? stackalloc uint[BigIntegerCalculator.StackAllocThreshold]
+                                : digitsFromPool = ArrayPool<uint>.Shared.Rent(size)).Slice(0, size);
 
                 BigIntegerCalculator.Subtract(leftBits, rightBits, bits);
                 result = new BigIntegerDecimal(bits, leftSign < 0);
             }
 
             if (digitsFromPool != null)
-                ArrayPool<ulong>.Shared.Return(digitsFromPool);
+                ArrayPool<uint>.Shared.Return(digitsFromPool);
 
             return result;
         }
@@ -1163,8 +1159,12 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
         /// <returns><paramref name="value" /> converted to a big integer.</returns>
         public static implicit operator BigIntegerDecimal(Int128 value)
         {
-            if (value < 0)
-                return -(BigIntegerDecimal)(UInt128)value;
+            if (Int128.IsNegative(value))
+            {
+                if (value == Int128.MinValue)
+                    return -(BigIntegerDecimal)((UInt128)Int128.MaxValue + 1);
+                return -(BigIntegerDecimal)(UInt128)(-Int128.Abs(value));
+            }
             return (BigIntegerDecimal)(UInt128)value;
         }
 
@@ -1197,13 +1197,9 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
 
             (value, var rem0) = UInt128.DivRem(value, B);
             (value, var rem1) = UInt128.DivRem(value, B);
-            ulong rem2 = (ulong)value;
+            var rem2 = (uint)value;
 
-            if (rem2 != 0)
-                return new BigIntegerDecimal(stackalloc ulong[3] { (ulong)rem0, (ulong)rem1, rem2 }, false);
-            if (rem1 != 0)
-                return new BigIntegerDecimal(stackalloc ulong[2] { (ulong)rem0, (ulong)rem1 }, false);
-            return new BigIntegerDecimal((ulong)rem0);
+            return new BigIntegerDecimal(stackalloc uint[3] { (uint)rem0, (uint)rem1, rem2 }, false);
         }
 
         public static BigIntegerDecimal operator -(BigIntegerDecimal value)
@@ -1252,7 +1248,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             return Multiply(left._dig, left._sign, right._dig, right._sign);
         }
 
-        private static BigIntegerDecimal Multiply(ReadOnlySpan<ulong> left, int leftSign, ReadOnlySpan<ulong> right, int rightSign)
+        private static BigIntegerDecimal Multiply(ReadOnlySpan<uint> left, int leftSign, ReadOnlySpan<uint> right, int rightSign)
         {
             bool trivialLeft = left.IsEmpty;
             bool trivialRight = right.IsEmpty;
@@ -1260,16 +1256,16 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             Debug.Assert(!(trivialLeft && trivialRight), "Trivial cases should be handled on the caller operator");
 
             BigIntegerDecimal result;
-            ulong[]? digitsFromPool = null;
+            uint[]? digitsFromPool = null;
 
             if (trivialLeft)
             {
                 Debug.Assert(!right.IsEmpty);
 
                 int size = right.Length + 1;
-                Span<ulong> bits = ((uint)size <= BigIntegerCalculator.StackAllocThreshold
-                                ? stackalloc ulong[BigIntegerCalculator.StackAllocThreshold]
-                                : digitsFromPool = ArrayPool<ulong>.Shared.Rent(size)).Slice(0, size);
+                Span<uint> bits = ((uint)size <= BigIntegerCalculator.StackAllocThreshold
+                                ? stackalloc uint[BigIntegerCalculator.StackAllocThreshold]
+                                : digitsFromPool = ArrayPool<uint>.Shared.Rent(size)).Slice(0, size);
 
                 BigIntegerCalculator.Multiply(right, NumericsHelpers.Abs(leftSign), bits);
                 result = new BigIntegerDecimal(bits, (leftSign < 0) ^ (rightSign < 0));
@@ -1279,9 +1275,9 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
                 Debug.Assert(!left.IsEmpty);
 
                 int size = left.Length + 1;
-                Span<ulong> bits = ((uint)size <= BigIntegerCalculator.StackAllocThreshold
-                                ? stackalloc ulong[BigIntegerCalculator.StackAllocThreshold]
-                                : digitsFromPool = ArrayPool<ulong>.Shared.Rent(size)).Slice(0, size);
+                Span<uint> bits = ((uint)size <= BigIntegerCalculator.StackAllocThreshold
+                                ? stackalloc uint[BigIntegerCalculator.StackAllocThreshold]
+                                : digitsFromPool = ArrayPool<uint>.Shared.Rent(size)).Slice(0, size);
 
                 BigIntegerCalculator.Multiply(left, NumericsHelpers.Abs(rightSign), bits);
                 result = new BigIntegerDecimal(bits, (leftSign < 0) ^ (rightSign < 0));
@@ -1289,9 +1285,9 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             else if (left == right)
             {
                 int size = left.Length + right.Length;
-                Span<ulong> bits = ((uint)size <= BigIntegerCalculator.StackAllocThreshold
-                                ? stackalloc ulong[BigIntegerCalculator.StackAllocThreshold]
-                                : digitsFromPool = ArrayPool<ulong>.Shared.Rent(size)).Slice(0, size);
+                Span<uint> bits = ((uint)size <= BigIntegerCalculator.StackAllocThreshold
+                                ? stackalloc uint[BigIntegerCalculator.StackAllocThreshold]
+                                : digitsFromPool = ArrayPool<uint>.Shared.Rent(size)).Slice(0, size);
 
                 BigIntegerCalculator.Square(left, bits);
                 result = new BigIntegerDecimal(bits, (leftSign < 0) ^ (rightSign < 0));
@@ -1301,9 +1297,9 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
                 Debug.Assert(!left.IsEmpty && !right.IsEmpty);
 
                 int size = left.Length + right.Length;
-                Span<ulong> bits = ((uint)size <= BigIntegerCalculator.StackAllocThreshold
-                                ? stackalloc ulong[BigIntegerCalculator.StackAllocThreshold]
-                                : digitsFromPool = ArrayPool<ulong>.Shared.Rent(size)).Slice(0, size);
+                Span<uint> bits = ((uint)size <= BigIntegerCalculator.StackAllocThreshold
+                                ? stackalloc uint[BigIntegerCalculator.StackAllocThreshold]
+                                : digitsFromPool = ArrayPool<uint>.Shared.Rent(size)).Slice(0, size);
                 bits.Clear();
 
                 BigIntegerCalculator.Multiply(right, left, bits);
@@ -1314,9 +1310,9 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
                 Debug.Assert(!left.IsEmpty && !right.IsEmpty);
 
                 int size = left.Length + right.Length;
-                Span<ulong> bits = ((uint)size <= BigIntegerCalculator.StackAllocThreshold
-                                ? stackalloc ulong[BigIntegerCalculator.StackAllocThreshold]
-                                : digitsFromPool = ArrayPool<ulong>.Shared.Rent(size)).Slice(0, size);
+                Span<uint> bits = ((uint)size <= BigIntegerCalculator.StackAllocThreshold
+                                ? stackalloc uint[BigIntegerCalculator.StackAllocThreshold]
+                                : digitsFromPool = ArrayPool<uint>.Shared.Rent(size)).Slice(0, size);
                 bits.Clear();
 
                 BigIntegerCalculator.Multiply(left, right, bits);
@@ -1324,7 +1320,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             }
 
             if (digitsFromPool != null)
-                ArrayPool<ulong>.Shared.Return(digitsFromPool);
+                ArrayPool<uint>.Shared.Return(digitsFromPool);
 
             return result;
         }
@@ -1349,16 +1345,16 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
                 return s_bnZeroInt;
             }
 
-            ulong[]? quotientFromPool = null;
+            uint[]? quotientFromPool = null;
 
             if (trivialDivisor)
             {
                 Debug.Assert(dividend._dig != null);
 
                 int size = dividend._dig.Length;
-                Span<ulong> quotient = ((uint)size <= BigIntegerCalculator.StackAllocThreshold
-                                    ? stackalloc ulong[BigIntegerCalculator.StackAllocThreshold]
-                                    : quotientFromPool = ArrayPool<ulong>.Shared.Rent(size)).Slice(0, size);
+                Span<uint> quotient = ((uint)size <= BigIntegerCalculator.StackAllocThreshold
+                                    ? stackalloc uint[BigIntegerCalculator.StackAllocThreshold]
+                                    : quotientFromPool = ArrayPool<uint>.Shared.Rent(size)).Slice(0, size);
 
                 try
                 {
@@ -1369,7 +1365,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
                 finally
                 {
                     if (quotientFromPool != null)
-                        ArrayPool<ulong>.Shared.Return(quotientFromPool);
+                        ArrayPool<uint>.Shared.Return(quotientFromPool);
                 }
             }
 
@@ -1382,15 +1378,15 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             else
             {
                 int size = dividend._dig.Length - divisor._dig.Length + 1;
-                Span<ulong> quotient = ((uint)size < BigIntegerCalculator.StackAllocThreshold
-                                    ? stackalloc ulong[BigIntegerCalculator.StackAllocThreshold]
-                                    : quotientFromPool = ArrayPool<ulong>.Shared.Rent(size)).Slice(0, size);
+                Span<uint> quotient = ((uint)size < BigIntegerCalculator.StackAllocThreshold
+                                    ? stackalloc uint[BigIntegerCalculator.StackAllocThreshold]
+                                    : quotientFromPool = ArrayPool<uint>.Shared.Rent(size)).Slice(0, size);
 
                 BigIntegerCalculator.Divide(dividend._dig, divisor._dig, quotient);
                 var result = new BigIntegerDecimal(quotient, (dividend._sign < 0) ^ (divisor._sign < 0));
 
                 if (quotientFromPool != null)
-                    ArrayPool<ulong>.Shared.Return(quotientFromPool);
+                    ArrayPool<uint>.Shared.Return(quotientFromPool);
 
                 return result;
             }
@@ -1430,17 +1426,17 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
                 return dividend;
             }
 
-            ulong[]? digitsFromPool = null;
+            uint[]? digitsFromPool = null;
             int size = dividend._dig.Length;
-            Span<ulong> bits = (size <= BigIntegerCalculator.StackAllocThreshold
-                            ? stackalloc ulong[BigIntegerCalculator.StackAllocThreshold]
-                            : digitsFromPool = ArrayPool<ulong>.Shared.Rent(size)).Slice(0, size);
+            Span<uint> bits = (size <= BigIntegerCalculator.StackAllocThreshold
+                            ? stackalloc uint[BigIntegerCalculator.StackAllocThreshold]
+                            : digitsFromPool = ArrayPool<uint>.Shared.Rent(size)).Slice(0, size);
 
             BigIntegerCalculator.Remainder(dividend._dig, divisor._dig, bits);
             var result = new BigIntegerDecimal(bits, dividend._sign < 0);
 
             if (digitsFromPool != null)
-                ArrayPool<ulong>.Shared.Return(digitsFromPool);
+                ArrayPool<uint>.Shared.Return(digitsFromPool);
 
             return result;
         }

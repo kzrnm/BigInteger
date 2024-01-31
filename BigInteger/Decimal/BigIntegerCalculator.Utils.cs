@@ -3,17 +3,15 @@
 
 using System;
 using System.Diagnostics;
-using System.Numerics;
 using System.Runtime.CompilerServices;
 
 namespace Kzrnm.Numerics.Decimal
 {
     internal static partial class BigIntegerCalculator
     {
-        internal const ulong Base = 1_000_000_000_000_000_000;
-        internal const ulong BaseSqrt = 1_000_000_000;
-        internal const int BaseLog = 18;
-        static readonly ulong[] UInt64PowersOfTen = new ulong[]
+        internal const int Base = 1_000_000_000;
+        internal const int BaseLog = 9;
+        static readonly uint[] UInt32PowersOfTen = new uint[]
         {
             1,
             10,
@@ -25,15 +23,6 @@ namespace Kzrnm.Numerics.Decimal
             10000000,
             100000000,
             1000000000,
-            10000000000,
-            100000000000,
-            1000000000000,
-            10000000000000,
-            100000000000000,
-            1000000000000000,
-            10000000000000000,
-            100000000000000000,
-            1000000000000000000,
        };
 
 #if DEBUG
@@ -44,7 +33,7 @@ namespace Kzrnm.Numerics.Decimal
 #endif
         int StackAllocThreshold = 64;
 
-        public static int Compare(ReadOnlySpan<ulong> left, ReadOnlySpan<ulong> right)
+        public static int Compare(ReadOnlySpan<uint> left, ReadOnlySpan<uint> right)
         {
             Debug.Assert(left.Length <= right.Length || left.Slice(right.Length).Trim(0u).Length > 0);
             Debug.Assert(left.Length >= right.Length || right.Slice(left.Length).Trim(0u).Length > 0);
@@ -60,7 +49,7 @@ namespace Kzrnm.Numerics.Decimal
             return left[iv] < right[iv] ? -1 : 1;
         }
 
-        private static int CompareActual(ReadOnlySpan<ulong> left, ReadOnlySpan<ulong> right)
+        private static int CompareActual(ReadOnlySpan<uint> left, ReadOnlySpan<uint> right)
         {
             if (left.Length != right.Length)
             {
@@ -80,7 +69,7 @@ namespace Kzrnm.Numerics.Decimal
             return Compare(left, right);
         }
 
-        private static int ActualLength(ReadOnlySpan<ulong> value)
+        private static int ActualLength(ReadOnlySpan<uint> value)
         {
             // Since we're reusing memory here, the actual length
             // of a given value may be less then the array's length
@@ -92,7 +81,7 @@ namespace Kzrnm.Numerics.Decimal
             return length;
         }
 
-        private static int Reduce(Span<ulong> bits, ReadOnlySpan<ulong> modulus)
+        private static int Reduce(Span<uint> bits, ReadOnlySpan<uint> modulus)
         {
             // Executes a modulo operation using the divide operation.
 
@@ -106,135 +95,36 @@ namespace Kzrnm.Numerics.Decimal
         }
 
         [Conditional("DEBUG")]
-        public static void DummyForDebug(Span<ulong> bits)
+        public static void DummyForDebug(Span<uint> bits)
         {
             // Reproduce the case where the return value of `stackalloc uint` is not initialized to zero.
             bits.Fill(0xCD);
         }
-
         [MethodImpl(256)]
-        public static ulong DivRem(ulong hi, ulong lo, ulong d, out ulong rem)
+        static uint DivRemBase(uint v, out uint remainder)
         {
-            Debug.Assert(hi < d);
-
-            ulong q;
-            if (hi == 0)
-            {
-                (q, rem) = Math.DivRem(lo, d);
-                return q;
-            }
-
-            ulong mul = Base / (d + 1);
-            if (mul > 1)
-            {
-                d *= mul;
-                hi *= mul;
-                hi += BigMul(lo, mul, out lo);
-            }
-
-            var (lohi, lolo) = Math.DivRem(lo, BaseSqrt);
-
-            q = D3n2n(hi, lohi, d, out ulong r1) * BaseSqrt;
-            q += D3n2n(r1, lolo, d, out rem);
-            if (mul > 1)
-                rem /= mul;
+            var q = v / Base;
+            remainder = v - q * Base;
             return q;
-
-
-            [MethodImpl(256)]
-            static ulong D3n2n(ulong a12, ulong a3, ulong b, out ulong rem)
-            {
-                var (b1, b2) = Math.DivRem(b, BaseSqrt);
-                Debug.Assert(a12 < Base);
-                Debug.Assert(a3 < BaseSqrt);
-                Debug.Assert(b < Base);
-
-                ulong quo;
-                (quo, rem) = Math.DivRem(a12, b1);
-                var d = quo * b2;
-
-                rem *= BaseSqrt;
-                rem += a3;
-                while (rem < d)
-                {
-                    rem += b;
-                    --quo;
-                }
-                rem -= d;
-
-                return quo;
-            }
         }
-
-        /// <summary>
-        /// [Return, <paramref name="low"/>] <paramref name="a"/> * <paramref name="b"/>
-        /// </summary>
         [MethodImpl(256)]
-        public static ulong BigMul(ulong a, ulong b, out ulong low)
+        static ulong DivRemBase(ulong v, out uint remainder)
         {
-            Debug.Assert(a < Base);
-            Debug.Assert(b < Base);
-
-            var aHi = a / BaseSqrt;
-            var aLo = a - aHi * BaseSqrt;
-
-            var bHi = b / BaseSqrt;
-            var bLo = b - bHi * BaseSqrt;
-
-            var hi = aHi * bHi;
-            low = aLo * bLo;
-
-            var mi = aLo * bHi + aHi * bLo;
-
-            var mh = mi / BaseSqrt;
-            var ml = mi - mh * BaseSqrt;
-
-            low += ml * BaseSqrt;
-            if (low >= Base)
-            {
-                low -= Base;
-                ++hi;
-            }
-            return hi + mh;
+            var q = v / Base;
+            remainder = (uint)(v - q * Base);
+            return q;
         }
-
-        /// <summary>
-        /// [Return, <paramref name="low"/>] <paramref name="a"/> * <paramref name="b"/> + <paramref name="c"/>
-        /// </summary>
         [MethodImpl(256)]
-        public static ulong BigMulAdd(ulong a, ulong b, ulong c, out ulong low)
+        static long DivRemBase(long v, out uint remainder)
         {
-            var upper = BigMul(a, b, out low);
-            upper += SafeAdd(ref low, c);
-            return upper;
-        }
-
-        /// <returns>(a+b)%Base</returns>
-        [MethodImpl(256)]
-        public static uint SafeAdd(ref ulong a, ulong b)
-        {
-            a += b;
-            if (a >= Base)
-            {
-                a -= Base;
-                return 1;
-            }
-            return 0;
-        }
-
-        [MethodImpl(256)]
-        public static long DivRemBase(long v, out ulong remainder)
-        {
-            const long B = (long)Base;
-            var q = v / B;
-            var rem = v - q * B;
-
+            var q = v / Base;
+            var rem = v - q * Base;
             if (rem < 0)
             {
-                rem += B;
+                rem += Base;
                 --q;
             }
-            remainder = (ulong)rem;
+            remainder = (uint)rem;
             return q;
         }
     }
