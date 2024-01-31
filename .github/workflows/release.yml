@@ -65,6 +65,7 @@ jobs:
         with:
           name: dist-${{ matrix.target.configuration }}
           path: bin/Packages/${{ matrix.target.configuration }}
+          retention-days: 1
 
   merge:
     runs-on: ubuntu-latest
