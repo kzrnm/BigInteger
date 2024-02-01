@@ -183,4 +183,23 @@ namespace Kzrnm.Numerics.Test
             }
         }
     }
+
+    public class BigIntegerThresholdTests : ThresholdTestsBase
+    {
+        [Fact]
+        public void ParseTrailingZero()
+        {
+            RunWithFakeThreshold(Number.s_naiveThreshold, 0, () =>
+            {
+                var rnd = new Random(227);
+                for (int i = 0; i < 1000; i++)
+                {
+                    var s = rnd.GetRandomDigits(rnd.Next(1, 100)) + "1" + new string('0', 8);
+                    var num = MyBigInteger.Parse(s, null);
+                    $"{num}".Should().Be(s);
+                    num.ToString().Should().Be(s);
+                }
+            });
+        }
+    }
 }

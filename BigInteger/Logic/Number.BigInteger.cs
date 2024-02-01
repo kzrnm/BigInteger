@@ -721,7 +721,7 @@ namespace Kzrnm.Numerics.Logic
                 // log_{2^32}(10^9)
                 const double digitRatio = 0.934292276687070661;
 
-                Span<uint> currentBuffer;
+                scoped Span<uint> currentBuffer;
                 uint[]? arrayFromPoolForMultiplier = null;
                 uint[]? arrayFromPoolForResultBuffer = null;
                 uint[]? arrayFromPoolForResultBuffer2 = null;
@@ -958,6 +958,7 @@ namespace Kzrnm.Numerics.Logic
                     if (trailingZeroBuffer.Length <= 1)
                     {
                         Debug.Assert(trailingZeroBuffer.Length == 1);
+                        uint[]? resultBufferFromPool = null;
                         uint trailingZero = trailingZeroBuffer[0];
                         if (trailingZero != 1)
                         {
@@ -972,12 +973,26 @@ namespace Kzrnm.Numerics.Logic
                             }
                             if (carry != 0)
                             {
-                                currentBuffer = buffer.Slice(0, ++currentBufferSize);
+                                if (buffer.Length < ++currentBufferSize)
+                                {
+                                    Debug.Assert(buffer.Length + 1 == currentBufferSize);
+                                    currentBuffer = (currentBufferSize <= BigIntegerCalculator.StackAllocThreshold
+                                       ? stackalloc uint[BigIntegerCalculator.StackAllocThreshold]
+                                       : resultBufferFromPool = ArrayPool<uint>.Shared.Rent(currentBufferSize)).Slice(0, currentBufferSize);
+                                    buffer.CopyTo(currentBuffer);
+                                }
+                                else
+                                {
+                                    currentBuffer = buffer.Slice(0, currentBufferSize);
+                                }
                                 currentBuffer[i] = (uint)carry;
                             }
                         }
 
                         result = NumberBufferToBigInteger(currentBuffer, number.IsNegative);
+
+                        if (resultBufferFromPool != null)
+                            ArrayPool<uint>.Shared.Return(resultBufferFromPool);
                     }
                     else
                     {
