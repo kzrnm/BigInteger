@@ -809,12 +809,14 @@ namespace Kzrnm.Numerics.Logic
 
                             trailingZeroBuffer.Slice(0, currentTrailingZeroBufferLength).CopyTo(previousTrailingZeroBuffer);
                             trailingZeroBuffer.Slice(0, currentTrailingZeroBufferLength).Clear();
-                            if (multiplier.Length < previousTrailingZeroBuffer.Length)
-                                BigIntegerCalculator.Multiply(previousTrailingZeroBuffer, multiplier, trailingZeroBuffer);
-                            else
-                                BigIntegerCalculator.Multiply(multiplier, previousTrailingZeroBuffer, trailingZeroBuffer);
 
-                            currentTrailingZeroBufferLength += multiplier.Length;
+                            int newTrailingZeroBufferLength = currentTrailingZeroBufferLength + multiplier.Length;
+                            if (multiplier.Length < previousTrailingZeroBuffer.Length)
+                                BigIntegerCalculator.Multiply(previousTrailingZeroBuffer, multiplier, trailingZeroBuffer.Slice(0, newTrailingZeroBufferLength));
+                            else
+                                BigIntegerCalculator.Multiply(multiplier, previousTrailingZeroBuffer, trailingZeroBuffer.Slice(0, newTrailingZeroBufferLength));
+
+                            currentTrailingZeroBufferLength = newTrailingZeroBufferLength;
                             while (--currentTrailingZeroBufferLength >= 0 && trailingZeroBuffer[currentTrailingZeroBufferLength] == 0) ;
                             ++currentTrailingZeroBufferLength;
 
@@ -842,9 +844,10 @@ namespace Kzrnm.Numerics.Logic
                             {
                                 Debug.Assert(blockSize == lowerLen);
                                 Debug.Assert(blockSize >= multiplier.Length);
-                                Debug.Assert(multiplier.Length >= curBuffer.Slice(blockSize, upperLen).TrimEnd(0u).Length);
-
-                                BigIntegerCalculator.Multiply(multiplier, curBuffer.Slice(blockSize, upperLen).TrimEnd(0u), curNewBuffer.Slice(0, len));
+                                ReadOnlySpan<uint> curBufferTrimmed = curBuffer.Slice(blockSize, upperLen).TrimEnd(0u);
+                                Debug.Assert(multiplier.Length >= curBufferTrimmed.Length);
+                                Debug.Assert(multiplier.Length + curBufferTrimmed.Length <= len);
+                                BigIntegerCalculator.Multiply(multiplier, curBufferTrimmed, curNewBuffer.Slice(0, multiplier.Length + curBufferTrimmed.Length));
                             }
 
                             long carry = 0;
@@ -926,12 +929,14 @@ namespace Kzrnm.Numerics.Logic
 
                             trailingZeroBuffer.Slice(0, currentTrailingZeroBufferLength).CopyTo(previousTrailingZeroBuffer);
                             trailingZeroBuffer.Slice(0, currentTrailingZeroBufferLength).Clear();
-                            if (multiplier.Length < previousTrailingZeroBuffer.Length)
-                                BigIntegerCalculator.Multiply(previousTrailingZeroBuffer, multiplier, trailingZeroBuffer);
-                            else
-                                BigIntegerCalculator.Multiply(multiplier, previousTrailingZeroBuffer, trailingZeroBuffer);
 
-                            currentTrailingZeroBufferLength += multiplier.Length;
+                            int newTrailingZeroBufferLength = currentTrailingZeroBufferLength + multiplier.Length;
+                            if (multiplier.Length < previousTrailingZeroBuffer.Length)
+                                BigIntegerCalculator.Multiply(previousTrailingZeroBuffer, multiplier, trailingZeroBuffer.Slice(0, newTrailingZeroBufferLength));
+                            else
+                                BigIntegerCalculator.Multiply(multiplier, previousTrailingZeroBuffer, trailingZeroBuffer.Slice(0, newTrailingZeroBufferLength));
+
+                            currentTrailingZeroBufferLength = newTrailingZeroBufferLength;
                             while (--currentTrailingZeroBufferLength >= 0 && trailingZeroBuffer[currentTrailingZeroBufferLength] == 0) ;
                             ++currentTrailingZeroBufferLength;
 
