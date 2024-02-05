@@ -175,6 +175,9 @@ namespace Kzrnm.Numerics.Test
             foreach (int i in new int[] { 865, 20161 })
                 Test(new string('9', i));
 
+            for (int i = 1; i < 50; i++)
+                Test(new string('0', i));
+
             for (int i = 0; i < 50; i++)
                 Test("1" + new string('0', i));
 
