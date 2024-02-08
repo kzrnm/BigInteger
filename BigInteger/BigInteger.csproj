@@ -6,8 +6,8 @@
 		<Nullable>enable</Nullable>
 		<RootNamespace>Kzrnm.Numerics</RootNamespace>
 
-		<Version>0.2.3</Version>
-		<AssemblyVersion>0.2.3.101</AssemblyVersion>
+		<Version>0.2.4</Version>
+		<AssemblyVersion>0.2.4.101</AssemblyVersion>
 		<AssemblyVersion Condition="'$(Embedding)' == 'true'">$([System.Version]::Parse($(AssemblyVersion)).Major).$([System.Version]::Parse($(AssemblyVersion)).Minor).$([System.Version]::Parse($(AssemblyVersion)).Build).$([MSBuild]::Add(1000, $([System.Version]::Parse($(AssemblyVersion)).Revision)))</AssemblyVersion>
 		<DefineConstants Condition="'$(Embedding)' == 'true'">$(DefineConstants);Embedding</DefineConstants>
 
