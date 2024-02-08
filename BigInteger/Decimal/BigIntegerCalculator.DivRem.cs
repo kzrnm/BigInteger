@@ -8,7 +8,7 @@ using System.Numerics;
 
 namespace Kzrnm.Numerics.Decimal
 {
-    internal static partial class BigIntegerCalculator
+    static partial class BigIntegerCalculator
     {
 #if DEBUG
         // Mutable for unit testing...

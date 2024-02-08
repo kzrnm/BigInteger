@@ -7,7 +7,12 @@ using System.Runtime.CompilerServices;
 
 namespace Kzrnm.Numerics.Decimal
 {
-    internal static partial class BigIntegerCalculator
+#if Embedding
+    public
+#else
+    internal
+#endif
+    static partial class BigIntegerCalculator
     {
         internal const int Base = 1_000_000_000;
         internal const int BaseLog = 9;

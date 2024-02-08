@@ -8,7 +8,7 @@ using System.Diagnostics;
 
 namespace Kzrnm.Numerics.Logic
 {
-    internal static partial class BigIntegerCalculator
+    static partial class BigIntegerCalculator
     {
 #if DEBUG
         // Mutable for unit testing...

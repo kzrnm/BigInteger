@@ -8,7 +8,12 @@ using System.Runtime.CompilerServices;
 
 namespace Kzrnm.Numerics.Experiment
 {
-    internal static partial class BigIntegerCalculator
+#if Embedding
+    public
+#else
+    internal
+#endif
+    static partial class BigIntegerCalculator
     {
 #if DEBUG
         // Mutable for unit testing...

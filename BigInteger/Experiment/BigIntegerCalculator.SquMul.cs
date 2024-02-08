@@ -9,7 +9,7 @@ using System.Runtime.InteropServices;
 
 namespace Kzrnm.Numerics.Experiment
 {
-    internal static partial class BigIntegerCalculator
+    static partial class BigIntegerCalculator
     {
 #if DEBUG
         // Mutable for unit testing...

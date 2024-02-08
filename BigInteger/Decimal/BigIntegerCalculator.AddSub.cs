@@ -8,7 +8,7 @@ using System.Runtime.InteropServices;
 
 namespace Kzrnm.Numerics.Decimal
 {
-    internal static partial class BigIntegerCalculator
+    static partial class BigIntegerCalculator
     {
         private const int CopyToThreshold = 8;
 
