@@ -292,7 +292,12 @@ namespace Kzrnm.Numerics.Logic
 #endif
                                                            | NumberStyles.AllowCurrencySymbol | NumberStyles.AllowHexSpecifier);
 
-        private static ReadOnlySpan<uint> UInt32PowersOfTen => new uint[] { 1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000 };
+#if NET8_0_OR_GREATER
+        private static ReadOnlySpan<uint> UInt32PowersOfTen => [1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000];
+#else
+        private static uint[] _UInt32PowersOfTenCache = new uint[] { 1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000 };
+        private static ReadOnlySpan<uint> UInt32PowersOfTen => _UInt32PowersOfTenCache;
+#endif
 
         [DoesNotReturn]
         internal static void ThrowOverflowOrFormatException(ParsingStatus status) => throw GetException(status);

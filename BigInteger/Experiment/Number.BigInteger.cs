@@ -411,9 +411,35 @@ namespace Kzrnm.Numerics.Experiment
             => Environment.Is64BitProcess
             ? MemoryMarshal.Cast<ulong, nuint>(UInt64PowersOfTen)
             : MemoryMarshal.Cast<uint, nuint>(UInt32PowersOfTen);
-        private static ReadOnlySpan<uint> UInt32PowersOfTen
-            => new uint[] { 1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000 };
-        private static ReadOnlySpan<ulong> UInt64PowersOfTen => new ulong[]
+
+#if NET8_0_OR_GREATER
+        private static ReadOnlySpan<uint> UInt32PowersOfTen => [1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000];
+        private static ReadOnlySpan<ulong> UInt64PowersOfTen => [
+            1,
+            10,
+            100,
+            1000,
+            10000,
+            100000,
+            1000000,
+            10000000,
+            100000000,
+            1000000000,
+            10000000000,
+            100000000000,
+            1000000000000,
+            10000000000000,
+            100000000000000,
+            1000000000000000,
+            10000000000000000,
+            100000000000000000,
+            1000000000000000000,
+            10000000000000000000,
+        ];
+#else
+        private static uint[] _UInt32PowersOfTenCache = new uint[] { 1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000 };
+        private static ReadOnlySpan<uint> UInt32PowersOfTen => _UInt32PowersOfTenCache;
+        private static ulong[] _UInt64PowersOfTenCache = new ulong[]
         {
             1,
             10,
@@ -436,6 +462,8 @@ namespace Kzrnm.Numerics.Experiment
             1000000000000000000,
             10000000000000000000,
         };
+        private static ReadOnlySpan<ulong> UInt64PowersOfTen => _UInt64PowersOfTenCache;
+#endif
 
         [DoesNotReturn]
         internal static void ThrowOverflowOrFormatException(ParsingStatus status) => throw GetException(status);
