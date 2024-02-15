@@ -57,7 +57,7 @@ namespace Kzrnm.Numerics.Logic
             Add(left, bits, ref resultPtr, startIndex: i, initialCarry: carry);
         }
 
-        private static void AddSelf(Span<uint> left, ReadOnlySpan<uint> right)
+        public static void AddSelf(Span<uint> left, ReadOnlySpan<uint> right)
         {
             Debug.Assert(left.Length >= right.Length);
 

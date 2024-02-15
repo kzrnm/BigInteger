@@ -57,7 +57,7 @@ namespace Kzrnm.Numerics.Logic
             return Compare(left, right);
         }
 
-        private static int ActualLength(ReadOnlySpan<uint> value)
+        public static int ActualLength(ReadOnlySpan<uint> value)
         {
             // Since we're reusing memory here, the actual length
             // of a given value may be less then the array's length
