@@ -193,6 +193,13 @@ namespace Kzrnm.Numerics.Test
             for (int i = 1; i < 50; i++)
                 Test(new string('1', i) + new string('0', i));
 
+            for (int i = 1; i < 50; i++)
+                Test(new string('1', 500 + i) + new string('0', 3000 + i));
+            for (int i = 1; i < 50; i++)
+                Test(new string('1', 3000 + i) + new string('0', 3000 + i));
+            for (int i = 1; i < 50; i++)
+                Test("1" + new string('0', 3000 + i));
+
             foreach (var v in PlusMinus(0))
                 Test(v.ToString());
             foreach (var v in PlusMinus(int.MinValue))
