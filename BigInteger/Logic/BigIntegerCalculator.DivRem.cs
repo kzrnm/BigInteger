@@ -360,7 +360,8 @@ namespace Kzrnm.Numerics.Logic
             // Fast recursive division: Algorithm 3
             int n;
             {
-                int m = (int)BitOperations.RoundUpToPowerOf2((uint)(right.Length + DivideThreshold - 1) / (uint)DivideThreshold);
+                // m = min{1<<k|(1<<k) * DivideThreshold > right.Length}
+                int m = (int)BitOperations.RoundUpToPowerOf2((uint)right.Length / (uint)DivideThreshold + 1);
 
                 int j = (right.Length + m - 1) / m; // Ceil(right.Length/m)
                 n = j * m;
