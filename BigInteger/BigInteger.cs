@@ -1604,7 +1604,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             return Number.FormatBigInteger(this, format, NumberFormatInfo.GetInstance(provider));
         }
 
-        private string DebuggerDisplay
+        internal string DebuggerDisplay
         {
             get
             {

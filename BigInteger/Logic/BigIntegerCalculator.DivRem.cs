@@ -86,6 +86,41 @@ namespace Kzrnm.Numerics.Logic
                 DivideBurnikelZiegler(left, right, quotient, remainder);
         }
 
+        public static void Divide(ReadOnlySpan<uint> left, ReadOnlySpan<uint> right, Span<uint> quotient, Span<uint> remainder, int rightOmmited)
+        {
+            Debug.Assert(left.Length >= 1);
+            Debug.Assert(right.Length >= 1);
+            Debug.Assert(left.Length >= right.Length + rightOmmited);
+            Debug.Assert(quotient.Length == left.Length - (right.Length + rightOmmited) + 1);
+            Debug.Assert(remainder.Length == left.Length);
+            DummyForDebug(quotient);
+            DummyForDebug(remainder);
+
+            int rightLength = right.Length + rightOmmited;
+            if (rightLength < DivideThreshold || left.Length - rightLength < DivideThreshold)
+            {
+                left.CopyTo(remainder);
+                if (rightOmmited == 0)
+                    DivideGrammarSchool(remainder, right, quotient);
+                else
+                {
+                    uint[]? rightCopyFromPool = null;
+                    Span<uint> rightCopy = (rightLength <= StackAllocThreshold ?
+                                          stackalloc uint[StackAllocThreshold]
+                                          : rightCopyFromPool = ArrayPool<uint>.Shared.Rent(rightLength)).Slice(0, rightLength);
+                    right.CopyTo(rightCopy.Slice(rightOmmited));
+                    rightCopy.Slice(0, rightOmmited).Clear();
+
+                    DivideGrammarSchool(remainder, rightCopy, quotient);
+
+                    if (rightCopyFromPool != null)
+                        ArrayPool<uint>.Shared.Return(rightCopyFromPool);
+                }
+            }
+            else
+                DivideBurnikelZiegler(left, right, quotient, remainder, rightOmmited);
+        }
+
         public static void Divide(ReadOnlySpan<uint> left, ReadOnlySpan<uint> right, Span<uint> quotient)
         {
             Debug.Assert(left.Length >= 1);
@@ -343,12 +378,13 @@ namespace Kzrnm.Numerics.Logic
             return (chkHi > valHi) || ((chkHi == valHi) && (chkLoUInt32 > valLo));
         }
 
-        private static void DivideBurnikelZiegler(ReadOnlySpan<uint> left, ReadOnlySpan<uint> right, Span<uint> quotient, Span<uint> remainder)
+        private static void DivideBurnikelZiegler(ReadOnlySpan<uint> left, ReadOnlySpan<uint> right, Span<uint> quotient, Span<uint> remainder, int rightOmmited = 0)
         {
+            Debug.Assert(rightOmmited >= 0);
             Debug.Assert(left.Length >= 1);
             Debug.Assert(right.Length >= 1);
-            Debug.Assert(left.Length >= right.Length);
-            Debug.Assert(quotient.Length == left.Length - right.Length + 1);
+            Debug.Assert(left.Length >= right.Length + rightOmmited);
+            Debug.Assert(quotient.Length == left.Length - (right.Length + rightOmmited) + 1);
             Debug.Assert(remainder.Length == left.Length
                         || remainder.Length == 0);
 
@@ -361,13 +397,13 @@ namespace Kzrnm.Numerics.Logic
             int n;
             {
                 // m = min{1<<k|(1<<k) * DivideThreshold > right.Length}
-                int m = (int)BitOperations.RoundUpToPowerOf2((uint)right.Length / (uint)DivideThreshold + 1);
+                int m = (int)BitOperations.RoundUpToPowerOf2((uint)(right.Length + rightOmmited) / (uint)DivideThreshold + 1);
 
-                int j = (right.Length + m - 1) / m; // Ceil(right.Length/m)
+                int j = (right.Length + rightOmmited + m - 1) / m; // Ceil((right.Length+rightOmmited)/m)
                 n = j * m;
             }
 
-            int sigmaDigit = n - right.Length;
+            int sigmaDigit = n - right.Length - rightOmmited;
             int sigmaSmall = BitOperations.LeadingZeroCount(right[^1]);
 
             uint[]? bFromPool = null;
@@ -417,7 +453,7 @@ namespace Kzrnm.Numerics.Logic
             }
 
             Normalize(left, sigmaDigit, sigmaSmall, a);
-            Normalize(right, sigmaDigit, sigmaSmall, b);
+            Normalize(right, sigmaDigit + rightOmmited, sigmaSmall, b);
 
 
             int t = Math.Max(2, (a.Length + n - 1) / n); // Max(2, Ceil(a.Length/n))

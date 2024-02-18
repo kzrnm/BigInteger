@@ -1103,50 +1103,25 @@ namespace Kzrnm.Numerics.Logic
                 return;
             }
 
-            uint roundUp = BitOperations.RoundUpToPowerOf2((uint)bits.Length);
-            int powerOfTensLength = (int)(roundUp - 2);
-            uint[]? powerOfTensFromPool = null;
-            Span<uint> powerOfTens = (powerOfTensLength <= 512
-                ? stackalloc uint[512]
-                : (powerOfTensFromPool = ArrayPool<uint>.Shared.Rent(powerOfTensLength))).Slice(0, powerOfTensLength);
+            PowersOf1e9.FloorBufferSize(bits.Length, out int powersOf1e9BufferLength, out int mi);
+            uint[]? powersOf1e9BufferFromPool = null;
+            Span<uint> powersOf1e9Buffer = (
+                powersOf1e9BufferLength <= BigIntegerCalculator.StackAllocThreshold
+                ? stackalloc uint[BigIntegerCalculator.StackAllocThreshold]
+                : powersOf1e9BufferFromPool = ArrayPool<uint>.Shared.Rent(powersOf1e9BufferLength)).Slice(0, powersOf1e9BufferLength);
+            powersOf1e9Buffer.Clear();
 
+            PowersOf1e9 powersOf1e9 = new PowersOf1e9(powersOf1e9Buffer);
 
-            int indexesLength = BitOperations.TrailingZeroCount(roundUp);
-            Span<int> indexes = stackalloc int[indexesLength];
-
-            {
-                // Build powerOfTens
-                Debug.Assert(indexes.Length >= 2);
-
-                // powerOfTens[0..2] = 1E18
-                powerOfTens[0] = 2808348672;
-                powerOfTens[1] = 232830643;
-                powerOfTens.Slice(2).Clear();
-
-                indexes[0] = 0;
-                indexes[1] = 2;
-
-                for (int i = 1; i + 1 < indexes.Length; i++)
-                {
-                    Span<uint> prev = powerOfTens[indexes[i - 1]..indexes[i]];
-                    Span<uint> next = powerOfTens.Slice(indexes[i], prev.Length << 1);
-                    BigIntegerCalculator.Square(prev, next);
-
-                    int ni = next.Length;
-                    while (next[--ni] == 0) ;
-                    indexes[i + 1] = indexes[i] + ni + 1;
-                    Debug.Assert(powerOfTens[indexes[i + 1] - 1] != 0);
-                }
-            }
-
-            DivideAndConquer(powerOfTens, indexes, bits, destination, out backCharsWritten);
+            DivideAndConquer(powersOf1e9, mi, bits, destination, out backCharsWritten);
 
             const int kcchBase = 9;
             const uint kuBase = 1000000000;
 
-            static void DivideAndConquer(ReadOnlySpan<uint> powerOfTens, ReadOnlySpan<int> indexes, ReadOnlySpan<uint> bits, Span<char> destination, out int backCharsWritten)
+            static void DivideAndConquer(in PowersOf1e9 powersOf1e9, int powersIndex, ReadOnlySpan<uint> bits, Span<char> destination, out int backCharsWritten)
             {
                 Debug.Assert(bits.Length == 0 || bits[^1] != 0);
+                Debug.Assert(powersIndex >= 0);
 
                 if (bits.Length <= ToStringNaiveThreshold)
                 {
@@ -1155,16 +1130,16 @@ namespace Kzrnm.Numerics.Logic
                     return;
                 }
 
-                Debug.Assert(indexes.Length >= 2);
-
-                ReadOnlySpan<uint> powOfTen = powerOfTens[indexes[^2]..indexes[^1]];
-                while (bits.Length < powOfTen.Length || (bits.Length == powOfTen.Length && bits[^1] < powOfTen[^1]))
+                ReadOnlySpan<uint> powOfTen = powersOf1e9.GetSpan(powersIndex);
+                int omittedLength = PowersOf1e9.OmittedLength(powersIndex);
+                while (bits.Length < powOfTen.Length + omittedLength || BigIntegerCalculator.Compare(bits.Slice(omittedLength), powOfTen) <= 0)
                 {
-                    indexes = indexes.Slice(0, indexes.Length - 1);
-                    powOfTen = powerOfTens[indexes[^2]..indexes[^1]];
+                    --powersIndex;
+                    powOfTen = powersOf1e9.GetSpan(powersIndex);
+                    omittedLength = PowersOf1e9.OmittedLength(powersIndex);
                 }
 
-                int upperLength = bits.Length - powOfTen.Length + 1;
+                int upperLength = bits.Length - powOfTen.Length - omittedLength + 1;
                 uint[]? upperFromPool = null;
                 Span<uint> upper = ((uint)upperLength <= BigIntegerCalculator.StackAllocThreshold
                     ? stackalloc uint[BigIntegerCalculator.StackAllocThreshold]
@@ -1176,31 +1151,29 @@ namespace Kzrnm.Numerics.Logic
                     ? stackalloc uint[BigIntegerCalculator.StackAllocThreshold]
                     : lowerFromPool = ArrayPool<uint>.Shared.Rent(lowerLength)).Slice(0, lowerLength);
 
-                BigIntegerCalculator.Divide(bits, powOfTen, upper, lower);
+                BigIntegerCalculator.Divide(bits, powOfTen, upper, lower, omittedLength);
+                Debug.Assert(!upper.Trim(0u).IsEmpty);
 
-                if (upper.Length == 1 && upper[0] == 0)
-                {
-                    indexes = indexes.Slice(0, indexes.Length - 1);
-                    powOfTen = powerOfTens[indexes[^2]..indexes[^1]];
-
-                    if (upperFromPool != null)
-                        ArrayPool<uint>.Shared.Return(upperFromPool);
-
-                    upperFromPool = null;
-                    upperLength = bits.Length - powOfTen.Length + 1;
-                    upper = ((uint)upperLength <= BigIntegerCalculator.StackAllocThreshold
-                        ? stackalloc uint[BigIntegerCalculator.StackAllocThreshold]
-                        : upperFromPool = ArrayPool<uint>.Shared.Rent(upperLength)).Slice(0, upperLength);
-                    BigIntegerCalculator.Divide(bits, powOfTen, upper, lower);
-                }
-
-                int lowerStrLength = kcchBase * (1 << (indexes.Length - 1));
-                DivideAndConquer(powerOfTens, indexes, upper.TrimEnd(0u), destination.Slice(0, destination.Length - lowerStrLength), out backCharsWritten);
+                int lowerStrLength = kcchBase * (1 << powersIndex);
+                DivideAndConquer(
+                    powersOf1e9,
+                    powersIndex - 1,
+                    upper.Slice(0, BigIntegerCalculator.ActualLength(upper)),
+                    destination.Slice(0, destination.Length - lowerStrLength),
+                    out backCharsWritten);
                 if (upperFromPool != null)
                     ArrayPool<uint>.Shared.Return(upperFromPool);
+
+                DivideAndConquer(
+                    powersOf1e9,
+                    powersIndex - 1,
+                    lower.Slice(0, BigIntegerCalculator.ActualLength(lower)),
+                    destination,
+                    out int lowerWritten);
+
+                Debug.Assert(lowerStrLength >= lowerWritten);
                 backCharsWritten += lowerStrLength;
 
-                DivideAndConquer(powerOfTens, indexes.Slice(0, indexes.Length - 1), lower.TrimEnd(0u), destination, out _);
                 if (lowerFromPool != null)
                     ArrayPool<uint>.Shared.Return(lowerFromPool);
             }
@@ -1208,9 +1181,8 @@ namespace Kzrnm.Numerics.Logic
             static void Naive(ReadOnlySpan<uint> bits, Span<char> destination, out int backCharsWritten)
             {
                 int cuSrc = bits.Length;
-                int cuMax = checked(cuSrc * 10 / 9 + 2);
-                Debug.Assert(cuMax <= 256);
-                Span<uint> rguDst = stackalloc uint[cuMax];
+                Debug.Assert(checked(cuSrc * 10 / 9 + 2) <= 256);
+                Span<uint> rguDst = stackalloc uint[256];
                 rguDst.Clear();
                 int cuDst = 0;
 
@@ -1278,20 +1250,20 @@ namespace Kzrnm.Numerics.Logic
         {
             Debug.Assert(formatString == null || formatString.Length == formatSpan.Length);
 
-            char fmt = ParseFormatSpecifier(formatSpan, out int digits);
-
-            if ((char)(fmt | 0x20) == 'x')
+            int digits = 0;
+            char fmt = ParseFormatSpecifier(formatSpan, out digits);
+            if (fmt == 'x' || fmt == 'X')
             {
                 return FormatBigIntegerToHex(targetSpan, value, fmt, digits, info, destination, out charsWritten, out spanSuccess);
             }
-            if ((char)(fmt | 0x20) == 'b')
+            if (fmt == 'b' || fmt == 'B')
             {
                 return FormatBigIntegerToBinary(targetSpan, value, digits, destination, out charsWritten, out spanSuccess);
             }
 
             if (value._bits == null)
             {
-                if ((char)(fmt | 0x20) is 'g' or 'r')
+                if (fmt == 'g' || fmt == 'G' || fmt == 'r' || fmt == 'R')
                 {
                     formatSpan = formatString = digits > 0 ? $"D{digits}" : "D";
                 }
@@ -1309,26 +1281,25 @@ namespace Kzrnm.Numerics.Logic
                 }
             }
 
-            bool decimalFmt = ((char)(fmt | 0x20) is 'g' or 'r' or 'd');
-            bool isNegative = value._sign < 0;
+            bool decimalFmt = (fmt == 'g' || fmt == 'G' || fmt == 'd' || fmt == 'D' || fmt == 'r' || fmt == 'R');
 
             // The Ratio is calculated as: 1/log_{2^32}(10) + 1
             const double digitRatio = 9.6329598612473966;
 
-            int digitsStrLength;
+            int rgchBufSize;
             try
             {
                 checked
                 {
-                    digitsStrLength = (int)(digitRatio * value._bits.Length) + 1;
+                    rgchBufSize = (int)(digitRatio * value._bits.Length) + 1;
                     if (decimalFmt)
                     {
-                        if (digitsStrLength < digits)
-                            digitsStrLength = digits;
-                        if (isNegative)
-                            digitsStrLength += info.NegativeSign.Length;
+                        if (rgchBufSize < digits)
+                            rgchBufSize = digits;
+                        if (value._sign < 0)
+                            rgchBufSize += info.NegativeSign.Length;
                     }
-                    ++digitsStrLength;
+                    ++rgchBufSize;
                 }
             }
             catch (OverflowException e)
@@ -1336,47 +1307,52 @@ namespace Kzrnm.Numerics.Logic
                 throw new FormatException(SR.Format_TooLarge, e);
             }
 
-            char[]? digitsStrFromPool = null;
+            char[]? rgchFromPool = null;
+            Span<char> rgch = (rgchBufSize <= BigIntegerCalculator.StackAllocThreshold ?
+                        stackalloc char[BigIntegerCalculator.StackAllocThreshold]
+                        : rgchFromPool = ArrayPool<char>.Shared.Rent(rgchBufSize)).Slice(0, rgchBufSize);
+            rgch[^1] = '\0'; // for FormatProvider.FormatBigInteger
+            rgch = rgch.Slice(0, rgch.Length - 1);
+            rgch.Fill('0');
 
             try
             {
-                Span<char> digitsStr = (digitsStrLength <= 512
-                    ? stackalloc char[512]
-                    : (digitsStrFromPool = ArrayPool<char>.Shared.Rent(digitsStrLength)));
-                digitsStr[digitsStrLength - 1] = '\0'; // for FormatProvider.FormatBigInteger
-                digitsStr = digitsStr.Slice(0, digitsStrLength - 1);
-                digitsStr.Fill('0');
-
-                BigIntegerToDigits(value._bits, digitsStr, out int backCharsWritten);
+                BigIntegerToDigits(value._bits, rgch, out int numDigitsPrinted);
 
                 if (!decimalFmt)
+                    throw new NotSupportedException();
+
+                // Format Round-trip decimal
+                // This format is supported for integral types only. The number is converted to a string of
+                // decimal digits (0-9), prefixed by a minus sign if the number is negative. The precision
+                // specifier indicates the minimum number of digits desired in the resulting string. If required,
+                // the number is padded with zeros to its left to produce the number of digits given by the
+                // precision specifier.
+                int ichDst = rgch.Length - numDigitsPrinted;
+                while (digits > 0 && digits > numDigitsPrinted)
                 {
-                    throw new FormatException();
+                    // pad leading zeros
+                    rgch[--ichDst] = '0';
+                    digits--;
+                }
+                if (value._sign < 0)
+                {
+                    string negativeSign = info.NegativeSign;
+                    for (int i = negativeSign.Length - 1; i > -1; i--)
+                        rgch[--ichDst] = negativeSign[i];
                 }
 
-                if (backCharsWritten < digits)
-                {
-                    digitsStr.Slice(digitsStr.Length - digits, digits - backCharsWritten).Fill('0');
-                    backCharsWritten = digits;
-                }
-
-                if (isNegative)
-                {
-                    info.NegativeSign.CopyTo(digitsStr.Slice(digitsStr.Length - backCharsWritten - info.NegativeSign.Length, info.NegativeSign.Length));
-                    backCharsWritten += info.NegativeSign.Length;
-                }
-
-                ReadOnlySpan<char> resultSpan = digitsStr.Slice(digitsStr.Length - backCharsWritten);
-
+                int resultLength = rgch.Length - ichDst;
+                rgch = rgch.Slice(ichDst, resultLength);
                 if (!targetSpan)
                 {
                     charsWritten = 0;
                     spanSuccess = false;
-                    return new string(resultSpan);
+                    return new string(rgch);
                 }
-                else if (resultSpan.TryCopyTo(destination))
+                else if (rgch.TryCopyTo(destination))
                 {
-                    charsWritten = resultSpan.Length;
+                    charsWritten = resultLength;
                     spanSuccess = true;
                     return null;
                 }
@@ -1389,11 +1365,10 @@ namespace Kzrnm.Numerics.Logic
             }
             finally
             {
-                if (digitsStrFromPool != null)
-                    ArrayPool<char>.Shared.Return(digitsStrFromPool);
+                if (rgchFromPool != null)
+                    ArrayPool<char>.Shared.Return(rgchFromPool);
             }
         }
-
 
         internal interface IBigIntegerHexOrBinaryParser<TParser, TChar>
     where TParser : struct, IBigIntegerHexOrBinaryParser<TParser, TChar>
@@ -1729,6 +1704,26 @@ namespace Kzrnm.Numerics.Logic
                 int scale1E9 = digits / MaxPartialDigits;
                 int log2 = BitOperations.Log2((uint)scale1E9) + 1;
                 return (uint)log2 < (uint)Indexes.Length ? Indexes[log2] + 1 : Indexes[^1];
+            }
+
+            public static void FloorBufferSize(int size, out int bufferSize, out int maxIndex)
+            {
+                Debug.Assert(size > 0);
+
+                // binary search
+                // size < Indexes[hi+1] - Indexes[hi] + OmittedLength(hi)
+                // size >= Indexes[lo+1] - Indexes[lo] + OmittedLength(lo)
+                int hi = Indexes.Length - 1;
+                maxIndex = 0;
+                while (maxIndex + 1 < hi)
+                {
+                    int i = (hi + maxIndex) >> 1;
+                    if (size < Indexes[i + 1] - Indexes[i] + OmittedLength(i))
+                        hi = i;
+                    else
+                        maxIndex = i;
+                }
+                bufferSize = Indexes[maxIndex + 1] + 1;
             }
 
             public ReadOnlySpan<uint> GetSpan(int index)

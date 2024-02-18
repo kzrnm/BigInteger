@@ -1,4 +1,5 @@
 ﻿using Kzrnm.Numerics.Logic;
+using Microsoft.VisualStudio.TestPlatform.ObjectModel.Client;
 using System.Globalization;
 using System.Numerics;
 
@@ -6,6 +7,33 @@ namespace Kzrnm.Numerics.Test
 {
     public class BigIntegerTests : BigIntegerTestsBase<MyBigInteger>
     {
+        public static IEnumerable<object[]> RunFormatScientificNotationToBigIntegerAndViceVersaData()
+        {
+            yield return new object[] { "1E+1000", "1E+1000" };
+            yield return new object[] { "1E+1001", "1E+1001" };
+            yield return new object[] { "1E+10001", "1E+10001" };
+            yield return new object[] { "1E+100001", "1E+100001" };
+            yield return new object[] { "1E+99999", "1E+99999" };
+        }
+
+        [Theory]
+        [InlineData(1000)]
+        [InlineData(1001)]
+        [InlineData(10001)]
+        [InlineData(100001)]
+        [InlineData(99999)]
+        public static void RunFormatScientificNotationToBigIntegerAndViceVersa(int length)
+        {
+            BigInteger parsedValue;
+            string actualResult;
+
+            var v = "1" + new string('0', length);
+            parsedValue = BigInteger.Parse(v, NumberStyles.AllowExponent);
+            actualResult = parsedValue.ToString();
+
+            Assert.Equal(v, actualResult);
+        }
+
         [Fact]
         public void Powers1e9()
         {
