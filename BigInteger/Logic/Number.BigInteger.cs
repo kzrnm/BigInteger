@@ -1834,7 +1834,7 @@ namespace Kzrnm.Numerics.Logic
 
                     if (carry != 0)
                     {
-                        bits[curLength] = carry;
+                        bits[omittedLength + curLength] = carry;
                     }
                 }
             }
