@@ -1,10 +1,35 @@
 ﻿using Kzrnm.Numerics.Logic;
 using System.Globalization;
+using System.Numerics;
 
 namespace Kzrnm.Numerics.Test
 {
     public class BigIntegerTests : BigIntegerTestsBase<MyBigInteger>
     {
+        [Fact]
+        public void Powers1e9()
+        {
+            var buffer = new uint[5356];
+            var powersOf1e9 = new Number.PowersOf1e9(buffer);
+            var f9 = (uint)Math.Pow(5, 9);
+            for (int i = 0; i < 13; i++)
+            {
+                var powers = powersOf1e9.GetSpan(i);
+                (BitOperations.TrailingZeroCount(powers[0]) + 32 * Number.PowersOf1e9.OmittedLength(i)).Should().Be(9 * (1 << i));
+                for (int j = (1 << i) - 1; j >= 0; j--)
+                {
+                    var quo = new uint[powers.Length];
+                    BigIntegerCalculator.Divide(powers, f9, quo, out var remainder);
+                    remainder.Should().Be(0);
+                    powers = quo.AsSpan().TrimEnd(0u);
+                }
+
+                powers.Length.Should().Be(1);
+                int shift = (9 * (1 << i) - 32 * Number.PowersOf1e9.OmittedLength(i));
+                powers[0].Should().Be(1u << shift);
+            }
+        }
+
         [Fact]
         public void ParseHex()
         {

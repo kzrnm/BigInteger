@@ -172,6 +172,7 @@ namespace Kzrnm.Numerics.Test
         [Fact]
         public void ParseAndToStringTest()
         {
+            Test(new string('1', 500 + 19) + new string('0', 3000 + 19));
             foreach (int i in new int[] { 865, 20161 })
                 Test(new string('9', i));
 
