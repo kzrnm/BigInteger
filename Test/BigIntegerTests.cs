@@ -1,5 +1,4 @@
 ﻿using Kzrnm.Numerics.Logic;
-using Microsoft.VisualStudio.TestPlatform.ObjectModel.Client;
 using System.Globalization;
 using System.Numerics;
 
@@ -7,31 +6,23 @@ namespace Kzrnm.Numerics.Test
 {
     public class BigIntegerTests : BigIntegerTestsBase<MyBigInteger>
     {
-        public static IEnumerable<object[]> RunFormatScientificNotationToBigIntegerAndViceVersaData()
+        [Fact]
+        public void DivideBound()
         {
-            yield return new object[] { "1E+1000", "1E+1000" };
-            yield return new object[] { "1E+1001", "1E+1001" };
-            yield return new object[] { "1E+10001", "1E+10001" };
-            yield return new object[] { "1E+100001", "1E+100001" };
-            yield return new object[] { "1E+99999", "1E+99999" };
-        }
+            var right = (MyBigInteger.One << (BigIntegerCalculator.DivideThreshold * 4 * 32 - 1))
+                + (MyBigInteger.One << (BigIntegerCalculator.DivideThreshold * 2 * 32)) - 1;
+            var rem = right - 1;
 
-        [Theory]
-        [InlineData(1000)]
-        [InlineData(1001)]
-        [InlineData(10001)]
-        [InlineData(100001)]
-        [InlineData(99999)]
-        public static void RunFormatScientificNotationToBigIntegerAndViceVersa(int length)
-        {
-            BigInteger parsedValue;
-            string actualResult;
+            for (int i = 0; i < 130; i++)
+            {
+                var qi = BigIntegerCalculator.DivideThreshold * 8 * 32 * 4 - 10 + i;
+                var q = (MyBigInteger.One << qi) - 1;
+                var left = q * right + rem;
 
-            var v = "1" + new string('0', length);
-            parsedValue = BigInteger.Parse(v, NumberStyles.AllowExponent);
-            actualResult = parsedValue.ToString();
-
-            Assert.Equal(v, actualResult);
+                var (q2, r2) = MyBigInteger.DivRem(left, right);
+                q2.Should().Be(q);
+                r2.Should().Be(rem);
+            }
         }
 
         [Fact]

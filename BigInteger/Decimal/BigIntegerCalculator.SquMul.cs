@@ -338,7 +338,7 @@ namespace Kzrnm.Numerics.Decimal
                 SubtractCore(bitsLow, bitsHigh, core);
 
                 // ... and finally merge the result! :-)
-                AddSelf(bits.Slice(n), core.TrimEnd(0u));
+                AddSelf(bits.Slice(n), core.Slice(0, ActualLength(core)));
 
                 if (coreFromPool != null)
                     ArrayPool<uint>.Shared.Return(coreFromPool);

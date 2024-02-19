@@ -76,7 +76,7 @@ namespace Kzrnm.Numerics.Decimal
             DummyForDebug(quotient);
             DummyForDebug(remainder);
 
-            if (right.Length < DivideThreshold || left.Length - right.Length < DivideThreshold)
+            if (right.Length <= DivideThreshold || left.Length - right.Length <= DivideThreshold)
                 DivideGrammarSchool(left, right, quotient, remainder);
             else
                 DivideBurnikelZiegler(left, right, quotient, remainder);
@@ -90,7 +90,7 @@ namespace Kzrnm.Numerics.Decimal
             Debug.Assert(quotient.Length == left.Length - right.Length + 1);
             DummyForDebug(quotient);
 
-            if (right.Length < DivideThreshold || left.Length - right.Length < DivideThreshold)
+            if (right.Length <= DivideThreshold || left.Length - right.Length <= DivideThreshold)
             {
                 uint[]? remainderFromPool = null;
                 Span<uint> remainder = (left.Length <= StackAllocThreshold ?
@@ -122,7 +122,7 @@ namespace Kzrnm.Numerics.Decimal
                                   stackalloc uint[StackAllocThreshold]
                                   : quotientFromPool = ArrayPool<uint>.Shared.Rent(quotientLength)).Slice(0, quotientLength);
 
-            if (right.Length < DivideThreshold || left.Length - right.Length < DivideThreshold)
+            if (right.Length <= DivideThreshold || left.Length - right.Length <= DivideThreshold)
                 DivideGrammarSchool(left, right, default, remainder);
             else
                 DivideBurnikelZiegler(left, right, quotient, remainder);
@@ -164,7 +164,7 @@ namespace Kzrnm.Numerics.Decimal
             else
                 quotientActual = quotient;
 
-            if (right.Length < DivideThreshold || left.Length - right.Length < DivideThreshold)
+            if (right.Length <= DivideThreshold || left.Length - right.Length <= DivideThreshold)
                 DivideGrammarSchool(leftCopy, right, quotient, left);
             else
                 DivideBurnikelZiegler(leftCopy, right, quotientActual, left);
@@ -631,7 +631,7 @@ namespace Kzrnm.Numerics.Decimal
             Debug.Assert(remainder.Length >= right.Length + 1);
             Debug.Assert(right[^1] > 0);
 
-            if (right.Length % 2 != 0 || right.Length < DivideThreshold)
+            if (right.Length % 2 != 0 || right.Length <= DivideThreshold)
             {
                 BurnikelZieglerFallback(left, right, quotient, remainder);
                 return;
@@ -660,46 +660,38 @@ namespace Kzrnm.Numerics.Decimal
             Debug.Assert(2 * quotient.Length == right.Length);
             Debug.Assert(remainder.Length >= right.Length + 1);
             Debug.Assert(right[^1] > 0);
+            Debug.Assert(CompareActual(left12, right) < 0);
 
             int halfN = right.Length >> 1;
 
-            var a1 = left12.Slice(halfN);
-            var b1 = right.Slice(halfN);
-            var b2 = right.Slice(0, halfN);
-            var r1 = remainder.Slice(halfN);
+            ReadOnlySpan<uint> a1 = left12.Slice(halfN);
+            ReadOnlySpan<uint> b1 = right.Slice(halfN);
+            ReadOnlySpan<uint> b2 = right.Slice(0, halfN);
+            Span<uint> r1 = remainder.Slice(halfN);
+            uint[]? dFromPool = null;
+            Span<uint> d = (right.Length <= StackAllocThreshold ?
+                            stackalloc uint[StackAllocThreshold]
+                            : dFromPool = ArrayPool<uint>.Shared.Rent(right.Length)).Slice(0, right.Length);
 
             if (CompareActual(a1, b1) < 0)
             {
                 BurnikelZieglerD2n1n(left12, b1, quotient, r1);
+
+                d.Clear();
+                MultiplyActual(quotient, b2, d);
             }
             else
             {
-                quotient.Fill(uint.MaxValue);
+                Debug.Assert(CompareActual(a1, b1) == 0);
+                quotient.Fill(Base - 1);
 
-                uint[]? bbFromPool = null;
+                ReadOnlySpan<uint> a2 = left12.Slice(0, halfN);
+                Add(a2, b1, r1);
 
-                Span<uint> bb = (left12.Length <= StackAllocThreshold ?
-                                stackalloc uint[StackAllocThreshold]
-                                : bbFromPool = ArrayPool<uint>.Shared.Rent(left12.Length)).Slice(0, left12.Length);
-                b1.CopyTo(bb.Slice(halfN));
-                r1.Clear();
-
-                SubtractSelf(bb, b1);
-                SubtractSelf(r1, bb);
-
-                if (bbFromPool != null)
-                    ArrayPool<uint>.Shared.Return(bbFromPool);
+                d.Slice(0, halfN).Clear();
+                b2.CopyTo(d.Slice(halfN));
+                SubtractSelf(d, b2);
             }
-
-
-            uint[]? dFromPool = null;
-
-            Span<uint> d = (right.Length <= StackAllocThreshold ?
-                            stackalloc uint[StackAllocThreshold]
-                            : dFromPool = ArrayPool<uint>.Shared.Rent(right.Length)).Slice(0, right.Length);
-            d.Clear();
-
-            MultiplyActual(quotient, b2, d);
 
             // R = [R1, A3]
             left3.CopyTo(remainder.Slice(0, halfN));

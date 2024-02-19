@@ -16,6 +16,21 @@ namespace Kzrnm.Numerics.Decimal
     {
         internal const int Base = 1_000_000_000;
         internal const int BaseLog = 9;
+#if NET8_0_OR_GREATER
+        static ReadOnlySpan<uint> UInt32PowersOfTen =>
+        [
+            1,
+            10,
+            100,
+            1000,
+            10000,
+            100000,
+            1000000,
+            10000000,
+            100000000,
+            1000000000,
+       ];
+#else
         static readonly uint[] UInt32PowersOfTen = new uint[]
         {
             1,
@@ -29,6 +44,7 @@ namespace Kzrnm.Numerics.Decimal
             100000000,
             1000000000,
        };
+#endif
 
 #if DEBUG
         // Mutable for unit testing...

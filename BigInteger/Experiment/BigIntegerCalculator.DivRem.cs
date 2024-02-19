@@ -806,6 +806,7 @@ namespace Kzrnm.Numerics.Experiment
             Debug.Assert(2 * quotient.Length == right.Length);
             Debug.Assert(remainder.Length >= right.Length + 1);
             Debug.Assert(right[^1] > 0);
+            Debug.Assert(CompareActual(left12, right) < 0);
 
             int halfN = right.Length >> 1;
 
@@ -814,38 +815,30 @@ namespace Kzrnm.Numerics.Experiment
             ReadOnlySpan<nuint> b2 = right.Slice(0, halfN);
             Span<nuint> r1 = remainder.Slice(halfN);
 
-            if (CompareActual(a1, b1) < 0)
-            {
-                BurnikelZieglerD2n1n(left12, b1, quotient, r1);
-            }
-            else
-            {
-                quotient.Fill(uint.MaxValue);
-
-                nuint[]? bbFromPool = null;
-
-                Span<nuint> bb = (left12.Length <= StackAllocThreshold ?
-                                stackalloc nuint[StackAllocThreshold]
-                                : bbFromPool = ArrayPool<nuint>.Shared.Rent(left12.Length)).Slice(0, left12.Length);
-                b1.CopyTo(bb.Slice(halfN));
-                r1.Clear();
-
-                SubtractSelf(bb, b1);
-                SubtractSelf(r1, bb);
-
-                if (bbFromPool != null)
-                    ArrayPool<nuint>.Shared.Return(bbFromPool);
-            }
-
-
             nuint[]? dFromPool = null;
-
             Span<nuint> d = (right.Length <= StackAllocThreshold ?
                             stackalloc nuint[StackAllocThreshold]
                             : dFromPool = ArrayPool<nuint>.Shared.Rent(right.Length)).Slice(0, right.Length);
-            d.Clear();
 
-            MultiplyActual(quotient, b2, d);
+            if (CompareActual(a1, b1) < 0)
+            {
+                BurnikelZieglerD2n1n(left12, b1, quotient, r1);
+
+                d.Clear();
+                MultiplyActual(quotient, b2, d);
+            }
+            else
+            {
+                Debug.Assert(CompareActual(a1, b1) == 0);
+                quotient.Fill(nuint.MaxValue);
+
+                ReadOnlySpan<nuint> a2 = left12.Slice(0, halfN);
+                Add(a2, b1, r1);
+
+                d.Slice(0, halfN).Clear();
+                b2.CopyTo(d.Slice(halfN));
+                SubtractSelf(d, b2);
+            }
 
             // R = [R1, A3]
             left3.CopyTo(remainder.Slice(0, halfN));

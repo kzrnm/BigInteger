@@ -79,7 +79,10 @@ namespace Kzrnm.Numerics.Decimal
                 ref var result = ref left[i];
                 result += carry;
                 if (result >= Base)
+                {
                     carry = 1;
+                    result -= Base;
+                }
                 else
                     carry = 0;
             }
