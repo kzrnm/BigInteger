@@ -16,7 +16,7 @@ namespace Kzrnm.Numerics.Decimal
 #else
         internal const
 #endif
-        int DivideThreshold = 32;
+        int DivideBurnikelZieglerThreshold = 32;
 
         public static void Divide(ReadOnlySpan<uint> left, uint right, Span<uint> quotient, out uint remainder)
         {
@@ -76,7 +76,7 @@ namespace Kzrnm.Numerics.Decimal
             DummyForDebug(quotient);
             DummyForDebug(remainder);
 
-            if (right.Length <= DivideThreshold || left.Length - right.Length <= DivideThreshold)
+            if (right.Length < DivideBurnikelZieglerThreshold || left.Length - right.Length < DivideBurnikelZieglerThreshold)
                 DivideGrammarSchool(left, right, quotient, remainder);
             else
                 DivideBurnikelZiegler(left, right, quotient, remainder);
@@ -90,7 +90,7 @@ namespace Kzrnm.Numerics.Decimal
             Debug.Assert(quotient.Length == left.Length - right.Length + 1);
             DummyForDebug(quotient);
 
-            if (right.Length <= DivideThreshold || left.Length - right.Length <= DivideThreshold)
+            if (right.Length < DivideBurnikelZieglerThreshold || left.Length - right.Length < DivideBurnikelZieglerThreshold)
             {
                 uint[]? remainderFromPool = null;
                 Span<uint> remainder = (left.Length <= StackAllocThreshold ?
@@ -122,7 +122,7 @@ namespace Kzrnm.Numerics.Decimal
                                   stackalloc uint[StackAllocThreshold]
                                   : quotientFromPool = ArrayPool<uint>.Shared.Rent(quotientLength)).Slice(0, quotientLength);
 
-            if (right.Length <= DivideThreshold || left.Length - right.Length <= DivideThreshold)
+            if (right.Length < DivideBurnikelZieglerThreshold || left.Length - right.Length < DivideBurnikelZieglerThreshold)
                 DivideGrammarSchool(left, right, default, remainder);
             else
                 DivideBurnikelZiegler(left, right, quotient, remainder);
@@ -164,7 +164,7 @@ namespace Kzrnm.Numerics.Decimal
             else
                 quotientActual = quotient;
 
-            if (right.Length <= DivideThreshold || left.Length - right.Length <= DivideThreshold)
+            if (right.Length < DivideBurnikelZieglerThreshold || left.Length - right.Length < DivideBurnikelZieglerThreshold)
                 DivideGrammarSchool(leftCopy, right, quotient, left);
             else
                 DivideBurnikelZiegler(leftCopy, right, quotientActual, left);
@@ -410,8 +410,8 @@ namespace Kzrnm.Numerics.Decimal
             // Fast recursive division: Algorithm 3
             int n;
             {
-                // m = min{1<<k|(1<<k) * DivideThreshold > right.Length}
-                int m = (int)BitOperations.RoundUpToPowerOf2((uint)right.Length / (uint)DivideThreshold + 1);
+                // m = min{1<<k|(1<<k) * DivideBurnikelZieglerThreshold > right.Length}
+                int m = (int)BitOperations.RoundUpToPowerOf2((uint)right.Length / (uint)DivideBurnikelZieglerThreshold + 1);
 
                 int j = (right.Length + m - 1) / m; // Ceil(right.Length/m)
                 n = j * m;
@@ -631,7 +631,7 @@ namespace Kzrnm.Numerics.Decimal
             Debug.Assert(remainder.Length >= right.Length + 1);
             Debug.Assert(right[^1] > 0);
 
-            if (right.Length % 2 != 0 || right.Length <= DivideThreshold)
+            if (right.Length % 2 != 0 || right.Length < DivideBurnikelZieglerThreshold)
             {
                 BurnikelZieglerFallback(left, right, quotient, remainder);
                 return;

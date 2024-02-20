@@ -18,7 +18,7 @@ namespace Kzrnm.Numerics.Experiment
 #else
         internal const
 #endif
-        int DivideThreshold = 32;
+        int DivideBurnikelZieglerThreshold = 32;
 
         public static void Divide(ReadOnlySpan<nuint> left, uint right, Span<nuint> quotient, out uint remainder)
         {
@@ -118,7 +118,7 @@ namespace Kzrnm.Numerics.Experiment
             DummyForDebug(quotient);
             DummyForDebug(remainder);
 
-            if (right.Length < DivideThreshold || left.Length - right.Length < DivideThreshold)
+            if (right.Length < DivideBurnikelZieglerThreshold || left.Length - right.Length < DivideBurnikelZieglerThreshold)
             {
                 left.CopyTo(remainder);
                 DivideGrammarSchool(remainder, right, quotient);
@@ -135,7 +135,7 @@ namespace Kzrnm.Numerics.Experiment
             Debug.Assert(quotient.Length == left.Length - right.Length + 1);
             DummyForDebug(quotient);
 
-            if (right.Length < DivideThreshold || left.Length - right.Length < DivideThreshold)
+            if (right.Length < DivideBurnikelZieglerThreshold || left.Length - right.Length < DivideBurnikelZieglerThreshold)
             {
                 // Same as above, but only returning the quotient.
 
@@ -166,7 +166,7 @@ namespace Kzrnm.Numerics.Experiment
             Debug.Assert(remainder.Length == left.Length);
             DummyForDebug(remainder);
 
-            if (right.Length < DivideThreshold || left.Length - right.Length < DivideThreshold)
+            if (right.Length < DivideBurnikelZieglerThreshold || left.Length - right.Length < DivideBurnikelZieglerThreshold)
             {
                 // Same as above, but only returning the remainder.
 
@@ -201,7 +201,7 @@ namespace Kzrnm.Numerics.Experiment
                 || quotient.Length == 0);
             DummyForDebug(quotient);
 
-            if (right.Length < DivideThreshold || left.Length - right.Length < DivideThreshold)
+            if (right.Length < DivideBurnikelZieglerThreshold || left.Length - right.Length < DivideBurnikelZieglerThreshold)
                 DivideGrammarSchool(left, right, quotient);
             else
             {
@@ -578,8 +578,8 @@ namespace Kzrnm.Numerics.Experiment
             // Fast recursive division: Algorithm 3
             int n;
             {
-                // m = min{1<<k|(1<<k) * DivideThreshold > right.Length}
-                int m = (int)BitOperations.RoundUpToPowerOf2((uint)right.Length / (uint)DivideThreshold + 1);
+                // m = min{1<<k|(1<<k) * DivideBurnikelZieglerThreshold > right.Length}
+                int m = (int)BitOperations.RoundUpToPowerOf2((uint)(right.Length + DivideBurnikelZieglerThreshold - 1) / (uint)DivideBurnikelZieglerThreshold);
 
                 int j = (right.Length + m - 1) / m; // Ceil(right.Length/m)
                 n = j * m;
@@ -729,6 +729,7 @@ namespace Kzrnm.Numerics.Experiment
             Debug.Assert(quotient.Length == right.Length);
             Debug.Assert(remainder.Length >= right.Length + 1);
             Debug.Assert(right[^1] > 0);
+            Debug.Assert(right.Length <= DivideBurnikelZieglerThreshold);
 
             left = left.Slice(0, ActualLength(left));
 
@@ -777,7 +778,7 @@ namespace Kzrnm.Numerics.Experiment
             Debug.Assert(remainder.Length >= right.Length + 1);
             Debug.Assert(right[^1] > 0);
 
-            if (right.Length % 2 != 0 || right.Length < DivideThreshold)
+            if (right.Length % 2 != 0 || right.Length < DivideBurnikelZieglerThreshold)
             {
                 BurnikelZieglerFallback(left, right, quotient, remainder);
                 return;

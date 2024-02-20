@@ -2033,7 +2033,7 @@ namespace Kzrnm.Numerics.Experiment
 #else
         internal const
 #endif
-        int ToStringNaiveThreshold = BigIntegerCalculator.DivideThreshold;
+        int ToStringNaiveThreshold = BigIntegerCalculator.DivideBurnikelZieglerThreshold;
 
         static void BigIntegerToDigits(ReadOnlySpan<nuint> bits, Span<char> destination, out int backCharsWritten)
         {

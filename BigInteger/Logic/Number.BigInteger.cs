@@ -1089,7 +1089,7 @@ namespace Kzrnm.Numerics.Logic
 #else
         internal const
 #endif
-        int ToStringNaiveThreshold = BigIntegerCalculator.DivideThreshold;
+        int ToStringNaiveThreshold = BigIntegerCalculator.DivideBurnikelZieglerThreshold;
 
         private static void BigIntegerToDigits(ReadOnlySpan<uint> bits, Span<char> destination, out int backCharsWritten)
         {

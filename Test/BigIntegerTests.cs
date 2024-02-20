@@ -9,13 +9,13 @@ namespace Kzrnm.Numerics.Test
         [Fact]
         public void DivideBound()
         {
-            var right = (MyBigInteger.One << (BigIntegerCalculator.DivideThreshold * 4 * 32 - 1))
-                + (MyBigInteger.One << (BigIntegerCalculator.DivideThreshold * 2 * 32)) - 1;
+            var right = (MyBigInteger.One << (BigIntegerCalculator.DivideBurnikelZieglerThreshold * 4 * 32 - 1))
+                + (MyBigInteger.One << (BigIntegerCalculator.DivideBurnikelZieglerThreshold * 2 * 32)) - 1;
             var rem = right - 1;
 
             for (int i = 0; i < 130; i++)
             {
-                var qi = BigIntegerCalculator.DivideThreshold * 8 * 32 * 4 - 10 + i;
+                var qi = BigIntegerCalculator.DivideBurnikelZieglerThreshold * 8 * 32 * 4 - 10 + i;
                 var q = (MyBigInteger.One << qi) - 1;
                 var left = q * right + rem;
 
@@ -123,8 +123,8 @@ namespace Kzrnm.Numerics.Test
         {
             var rnd = new Random(227);
             {
-                var bytes1 = new byte[BigIntegerCalculator.DivideThreshold * sizeof(uint) / sizeof(byte) * 4];
-                var bytes2 = new byte[BigIntegerCalculator.DivideThreshold * sizeof(uint) / sizeof(byte) * 2];
+                var bytes1 = new byte[BigIntegerCalculator.DivideBurnikelZieglerThreshold * sizeof(uint) / sizeof(byte) * 4];
+                var bytes2 = new byte[BigIntegerCalculator.DivideBurnikelZieglerThreshold * sizeof(uint) / sizeof(byte) * 2];
 
                 bytes1.AsSpan().Fill(255);
                 bytes2[^1] = 0x80;
@@ -136,8 +136,8 @@ namespace Kzrnm.Numerics.Test
             }
             for (int i = 0; i < 100; i++)
             {
-                var bytes1 = new byte[BigIntegerCalculator.DivideThreshold * sizeof(uint) / sizeof(byte) * 4];
-                var bytes2 = new byte[BigIntegerCalculator.DivideThreshold * sizeof(uint) / sizeof(byte) * 2];
+                var bytes1 = new byte[BigIntegerCalculator.DivideBurnikelZieglerThreshold * sizeof(uint) / sizeof(byte) * 4];
+                var bytes2 = new byte[BigIntegerCalculator.DivideBurnikelZieglerThreshold * sizeof(uint) / sizeof(byte) * 2];
 
                 rnd.NextBytes(bytes1);
                 bytes2[^1] = 0x80;
@@ -149,8 +149,8 @@ namespace Kzrnm.Numerics.Test
             }
             for (int i = 0; i < 100; i++)
             {
-                var bytes1 = new byte[BigIntegerCalculator.DivideThreshold * sizeof(uint) / sizeof(byte) * 4];
-                var bytes2 = new byte[BigIntegerCalculator.DivideThreshold * sizeof(uint) / sizeof(byte) * 2];
+                var bytes1 = new byte[BigIntegerCalculator.DivideBurnikelZieglerThreshold * sizeof(uint) / sizeof(byte) * 4];
+                var bytes2 = new byte[BigIntegerCalculator.DivideBurnikelZieglerThreshold * sizeof(uint) / sizeof(byte) * 2];
 
                 rnd.NextBytes(bytes1);
                 rnd.NextBytes(bytes2);

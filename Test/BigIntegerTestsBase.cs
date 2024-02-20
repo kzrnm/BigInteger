@@ -71,9 +71,7 @@ namespace Kzrnm.Numerics.Test
                 var s = "1" + new string('0', 600);
                 yield return new BigIntegerData(s, s);
             }
-        }
-        public static IEnumerable<BigIntegerData> DivValues()
-        {
+
             var rnd = new Random(227);
             for (int i = 0; i < 200; i++)
             {
@@ -92,6 +90,24 @@ namespace Kzrnm.Numerics.Test
                 var length1 = rnd.Next(100, 200);
                 var length2 = rnd.Next(100, 200);
                 yield return new BigIntegerData(rnd.GetRandomDigits(length1), rnd.GetRandomDigits(length2));
+            }
+
+            for (int i = 0; i < 400; i++)
+            {
+                var length1 = rnd.Next(100, 200);
+                var length2 = rnd.Next(100, 200);
+                yield return new BigIntegerData(rnd.GetRandomDigits(length1), rnd.GetRandomDigits(length2));
+            }
+
+        }
+        public static IEnumerable<BigIntegerData> DivValues()
+        {
+            foreach (var d in MultiplyValues())
+                yield return d;
+            var rnd = new Random(227);
+            for (int i = 0; i < 400; i++)
+            {
+                yield return new BigIntegerData(rnd.GetRandomDigits(3 * 4932 - 10 + i), new string('9', 4932));
             }
         }
 
@@ -119,7 +135,7 @@ namespace Kzrnm.Numerics.Test
         [Fact]
         public void Multiply()
         {
-            foreach (var data in Values().Concat(MultiplyValues()).Concat(DivValues()))
+            foreach (var data in Values().Concat(MultiplyValues()))
             {
                 Equal(T.Parse(data.Left, null) * T.Parse(data.Right, null), data.OrigLeft * data.OrigRight);
                 Equal(T.Parse(data.Left, null) * -T.Parse(data.Right, null), data.OrigLeft * -data.OrigRight);
