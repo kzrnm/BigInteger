@@ -6,7 +6,6 @@ using BenchmarkDotNet.Running;
 using BenchmarkDotNet.Toolchains.CoreRun;
 using BenchmarkDotNet.Toolchains.CsProj;
 using Kzrnm.Numerics;
-using Kzrnm.Numerics.Experiment;
 using System;
 using System.Diagnostics;
 using System.Numerics;
@@ -110,7 +109,6 @@ public class BigIntegerAdd
 
     MyBigInteger my1, my2;
     OrigBigInteger orig1, orig2;
-    BigIntegerNative na1, na2;
 
     [GlobalSetup]
     public void Setup()
@@ -123,8 +121,6 @@ public class BigIntegerAdd
         orig2 = new OrigBigInteger(bytes2, isUnsigned: true);
         my1 = new MyBigInteger(bytes1, isUnsigned: true);
         my2 = new MyBigInteger(bytes2, isUnsigned: true);
-        na1 = new BigIntegerNative(bytes1, isUnsigned: true);
-        na2 = new BigIntegerNative(bytes2, isUnsigned: true);
     }
 
     [Benchmark(Baseline = true)]
@@ -145,7 +141,6 @@ public class BigIntegerMultiply
 
     MyBigInteger my1, my2;
     OrigBigInteger orig1, orig2;
-    BigIntegerNative na1, na2;
 
     [GlobalSetup]
     public void Setup()
@@ -158,8 +153,6 @@ public class BigIntegerMultiply
         orig2 = new OrigBigInteger(bytes2, isUnsigned: true);
         my1 = new MyBigInteger(bytes1, isUnsigned: true);
         my2 = new MyBigInteger(bytes2, isUnsigned: true);
-        na1 = new BigIntegerNative(bytes1, isUnsigned: true);
-        na2 = new BigIntegerNative(bytes2, isUnsigned: true);
     }
 
     [Benchmark(Baseline = true)]
@@ -180,7 +173,6 @@ public class BigIntegerDivide
 
     MyBigInteger my1, my2;
     OrigBigInteger orig1, orig2;
-    BigIntegerNative na1, na2;
 
     [GlobalSetup]
     public void Setup()
@@ -193,8 +185,6 @@ public class BigIntegerDivide
         orig2 = new OrigBigInteger(bytes2, isUnsigned: true);
         my1 = new MyBigInteger(bytes1, isUnsigned: true);
         my2 = new MyBigInteger(bytes2, isUnsigned: true);
-        na1 = new BigIntegerNative(bytes1, isUnsigned: true);
-        na2 = new BigIntegerNative(bytes2, isUnsigned: true);
     }
 
     [Benchmark(Baseline = true)]
