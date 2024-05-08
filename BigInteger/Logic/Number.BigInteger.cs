@@ -1132,7 +1132,7 @@ namespace Kzrnm.Numerics.Logic
 
                 ReadOnlySpan<uint> powOfTen = powersOf1e9.GetSpan(powersIndex);
                 int omittedLength = PowersOf1e9.OmittedLength(powersIndex);
-                while (bits.Length < powOfTen.Length + omittedLength || BigIntegerCalculator.Compare(bits.Slice(omittedLength), powOfTen) <= 0)
+                while (bits.Length < powOfTen.Length + omittedLength || BigIntegerCalculator.Compare(bits.Slice(omittedLength), powOfTen) < 0)
                 {
                     --powersIndex;
                     powOfTen = powersOf1e9.GetSpan(powersIndex);
