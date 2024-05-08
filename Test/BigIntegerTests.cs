@@ -226,6 +226,25 @@ namespace Kzrnm.Numerics.Test
                 my.ToString().Should().Be(expectedStr);
             }
         }
+
+
+        [Fact]
+        public void ToStringBoundTest()
+        {
+            foreach (var s in new[]
+            {
+                new string('9', 9* (1<<10))+new string('9', 9* (1<<10)),
+                "1"+new string('0', 9* (1<<10))+new string('9', 9* (1<<10)),
+                "1"+new string('0', 9* (1<<10)-1)+"1"+new string('9', 9* (1<<10)),
+                "1"+new string('0', 9* (1<<11)-1)+"1",
+            })
+            {
+                OrigBigInteger expected = OrigBigInteger.Parse(s);
+                MyBigInteger my = new MyBigInteger(expected.ToByteArray(), isUnsigned: true);
+                var expectedStr = expected.ToString();
+                my.ToString().Should().Be(expectedStr);
+            }
+        }
     }
 
     public class BigIntegerThresholdTests : ThresholdTestsBase
