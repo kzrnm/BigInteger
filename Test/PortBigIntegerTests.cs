@@ -4,8 +4,8 @@ using System.Numerics;
 
 namespace Kzrnm.Numerics.Test
 {
-    using BigInteger = MyBigInteger;
-    public class BigIntegerTests : BigIntegerTestsBase<BigInteger>
+    using BigInteger = PortBigInteger;
+    public class PortBigIntegerTests : BigIntegerTestsBase<BigInteger>
     {
         [Fact]
         public void DivideBound()
@@ -49,75 +49,6 @@ namespace Kzrnm.Numerics.Test
                 powers[0].Should().Be(1u << shift);
             }
         }
-
-        [Fact]
-        public void ParseHex()
-        {
-            for (int i = 1; i < 300; i++)
-            {
-                var s = "F" + new string('0', i) + "1";
-                Equal(BigInteger.Parse(s, NumberStyles.HexNumber), OrigBigInteger.Parse(s, NumberStyles.HexNumber));
-            }
-            for (int i = 1; i < 300; i++)
-            {
-                BigInteger.TryParse("F" + new string('0', i - 1) + "1", NumberStyles.HexNumber, null, out var result);
-                result.Should().Be((BigInteger.MinusOne << (4 * i)) + 1);
-            }
-            for (int i = 0; i < 300; i++)
-            {
-                for (int j = 1; j < 6; j++)
-                {
-                    BigInteger.TryParse(new string('F', j) + new string('0', i), NumberStyles.HexNumber, null, out var result);
-                    result.Should().Be(BigInteger.MinusOne << (4 * i));
-                }
-            }
-            for (int i = 0; i < 300; i++)
-            {
-                BigInteger.TryParse("8" + new string('0', i), NumberStyles.HexNumber, null, out var result);
-                result.Should().Be(BigInteger.MinusOne << (3 + 4 * i));
-            }
-
-            var rnd = new Random(227);
-            for (int len = 1; len < 200; len++)
-            {
-                for (int k = 0; k < 60; k++)
-                {
-                    var s = Enumerable.Repeat(rnd, len).Select(rnd => HexConverter.ToCharUpper(rnd.Next())).ToArray();
-                    Equal(BigInteger.Parse(s, NumberStyles.HexNumber), OrigBigInteger.Parse(s, NumberStyles.HexNumber));
-                }
-            }
-        }
-
-#if NET8_0_OR_GREATER
-        [Fact]
-        public void ParseBin()
-        {
-            BigInteger.Parse("0", NumberStyles.BinaryNumber).Should().Be(0);
-            BigInteger.Parse("0111111111111111111111111111111111", NumberStyles.BinaryNumber).Should().Be(0x1FFFFFFFFL);
-            BigInteger.Parse("111111111111111111111111111111110", NumberStyles.BinaryNumber).Should().Be(-2);
-            BigInteger.Parse("100000000000000000000000000000001", NumberStyles.BinaryNumber).Should().Be((-1L << 32) + 1);
-            BigInteger.Parse("100000000000000000000000000000000", NumberStyles.BinaryNumber).Should().Be(-1L << 32);
-
-            for (int i = 0; i < 300; i++)
-            {
-                BigInteger.TryParse("1" + new string('0', i), NumberStyles.BinaryNumber, null, out var result);
-                result.Should().Be(BigInteger.MinusOne << i);
-            }
-
-            var rnd = new Random(227);
-            for (int len = 1; len < 5000; len++)
-            {
-                for (int k = 0; k < 20; k++)
-                {
-                    var s = Enumerable.Repeat(rnd, len).Select(rnd => (char)(rnd.Next(2) + '0')).ToArray();
-                    BigInteger.Parse(s, NumberStyles.BinaryNumber);
-                    //.ToByteArray()
-                    //.Should().Equal(BigIntegerNative.Parse(s, NumberStyles.BinaryNumber).ToByteArray());
-
-                }
-            }
-        }
-#endif
 
         [Fact]
         public void RandomDivRem()
@@ -248,7 +179,7 @@ namespace Kzrnm.Numerics.Test
         }
     }
 
-    public class BigIntegerThresholdTests : ThresholdTestsBase
+    public class PortBigIntegerThresholdTests : ThresholdTestsBase
     {
         [Fact]
         public void ParseTrailingZero()

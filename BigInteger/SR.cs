@@ -1,10 +1,32 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using System;
+using System.Numerics;
+using System.Runtime.CompilerServices;
 
 namespace Kzrnm.Numerics
 {
+    internal enum ParsingStatus
+    {
+        OK,
+        Failed,
+        Overflow
+    }
+    internal enum NumberBufferKind : byte
+    {
+        Unknown = 0,
+        Integer = 1,
+        Decimal = 2,
+        FloatingPoint = 3,
+    }
     internal static class ThrowHelper
     {
+        public static void ThrowFormatException_BadFormatSpecifier() => new FormatException();
+        public static void ThrowIfNegative<T>(T value, [CallerArgumentExpression(nameof(value))] string? paramName = null)
+            where T : INumberBase<T>
+        {
+            if (T.IsNegative(value)) throw new ArgumentOutOfRangeException(paramName, value, SR.Format("SR.ArgumentOutOfRange_Generic_MustBeNonNegative", paramName, value));
+        }
+
         [DoesNotReturn]
         internal static void ThrowOverflowException()
         {

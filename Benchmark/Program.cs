@@ -14,6 +14,7 @@ using System.Runtime.InteropServices;
 
 using MyBigInteger = Kzrnm.Numerics.BigInteger;
 using OrigBigInteger = System.Numerics.BigInteger;
+using PortBigInteger = Kzrnm.Numerics.Port.BigInteger;
 
 public class BenchmarkConfig : ManualConfig
 {
@@ -29,8 +30,8 @@ public class BenchmarkConfig : ManualConfig
     {
         //AddDiagnoser(MemoryDiagnoser.Default);
         AddExporter(BenchmarkDotNet.Exporters.MarkdownExporter.GitHub);
-        AddJob(Job.Default.WithToolchain(CsProjCoreToolchain.NetCoreApp80));
-        AddJob(Job.Default.WithToolchain(CsProjCoreToolchain.NetCoreApp70));
+        AddJob(Job.ShortRun.WithToolchain(CsProjCoreToolchain.NetCoreApp80));
+        //AddJob(Job.Default.WithToolchain(CsProjCoreToolchain.NetCoreApp70));
 
         SummaryStyle = SummaryStyle.Default
         .WithRatioStyle(BenchmarkDotNet.Columns.RatioStyle.Value)
@@ -63,11 +64,11 @@ public class BigIntegerParse
         s = new(chars);
     }
 
-    [Benchmark(Baseline = true)]
-    public OrigBigInteger Orig() => OrigBigInteger.Parse(s);
+    [Benchmark(Baseline = true)] public OrigBigInteger Orig() => OrigBigInteger.Parse(s);
 
+    [Benchmark] public MyBigInteger New() => MyBigInteger.Parse(s);
     [Benchmark]
-    public MyBigInteger New() => MyBigInteger.Parse(s);
+    public PortBigInteger Port() => PortBigInteger.Parse(s);
 }
 
 [Config(typeof(BenchmarkConfig))]
@@ -81,21 +82,23 @@ public class BigIntegerToString
 
     MyBigInteger my;
     OrigBigInteger orig;
+    PortBigInteger port;
 
     [GlobalSetup]
     public void Setup()
     {
         var bytes = new byte[N];
         rnd.NextBytes(bytes);
-        orig = new OrigBigInteger(bytes, isUnsigned: true);
-        my = new MyBigInteger(bytes, isUnsigned: true);
+        orig = new(bytes, isUnsigned: true);
+        my = new(bytes, isUnsigned: true);
+        port = new(bytes, isUnsigned: true);
     }
 
     [Benchmark(Baseline = true)]
     public string Orig() => orig.ToString();
 
-    [Benchmark]
-    public string New() => my.ToString();
+    [Benchmark] public string New() => my.ToString();
+    [Benchmark] public string Port() => port.ToString();
 }
 
 [Config(typeof(BenchmarkConfig))]
@@ -109,6 +112,7 @@ public class BigIntegerAdd
 
     MyBigInteger my1, my2;
     OrigBigInteger orig1, orig2;
+    PortBigInteger port1, port2;
 
     [GlobalSetup]
     public void Setup()
@@ -117,17 +121,18 @@ public class BigIntegerAdd
         var bytes2 = new byte[N / 2];
         rnd.NextBytes(bytes1);
         rnd.NextBytes(bytes2);
-        orig1 = new OrigBigInteger(bytes1, isUnsigned: true);
-        orig2 = new OrigBigInteger(bytes2, isUnsigned: true);
-        my1 = new MyBigInteger(bytes1, isUnsigned: true);
-        my2 = new MyBigInteger(bytes2, isUnsigned: true);
+        orig1 = new(bytes1, isUnsigned: true);
+        orig2 = new(bytes2, isUnsigned: true);
+        my1 = new(bytes1, isUnsigned: true);
+        my2 = new(bytes2, isUnsigned: true);
+        port1 = new(bytes1, isUnsigned: true);
+        port2 = new(bytes2, isUnsigned: true);
     }
 
-    [Benchmark(Baseline = true)]
-    public OrigBigInteger Orig() => orig1 + orig2;
+    [Benchmark(Baseline = true)] public OrigBigInteger Orig() => orig1 + orig2;
 
-    [Benchmark]
-    public MyBigInteger New() => my1 + my2;
+    [Benchmark] public MyBigInteger New() => my1 + my2;
+    [Benchmark] public PortBigInteger Port() => port1 + port2;
 }
 
 [Config(typeof(BenchmarkConfig))]
@@ -141,6 +146,7 @@ public class BigIntegerMultiply
 
     MyBigInteger my1, my2;
     OrigBigInteger orig1, orig2;
+    PortBigInteger port1, port2;
 
     [GlobalSetup]
     public void Setup()
@@ -149,17 +155,18 @@ public class BigIntegerMultiply
         var bytes2 = new byte[N / 2];
         rnd.NextBytes(bytes1);
         rnd.NextBytes(bytes2);
-        orig1 = new OrigBigInteger(bytes1, isUnsigned: true);
-        orig2 = new OrigBigInteger(bytes2, isUnsigned: true);
-        my1 = new MyBigInteger(bytes1, isUnsigned: true);
-        my2 = new MyBigInteger(bytes2, isUnsigned: true);
+        orig1 = new(bytes1, isUnsigned: true);
+        orig2 = new(bytes2, isUnsigned: true);
+        my1 = new(bytes1, isUnsigned: true);
+        my2 = new(bytes2, isUnsigned: true);
+        port1 = new(bytes1, isUnsigned: true);
+        port2 = new(bytes2, isUnsigned: true);
     }
 
-    [Benchmark(Baseline = true)]
-    public OrigBigInteger Orig() => orig1 * orig2;
+    [Benchmark(Baseline = true)] public OrigBigInteger Orig() => orig1 * orig2;
 
-    [Benchmark]
-    public MyBigInteger New() => my1 * my2;
+    [Benchmark] public MyBigInteger New() => my1 * my2;
+    [Benchmark] public PortBigInteger Port() => port1 * port2;
 }
 
 [Config(typeof(BenchmarkConfig))]
@@ -173,6 +180,7 @@ public class BigIntegerDivide
 
     MyBigInteger my1, my2;
     OrigBigInteger orig1, orig2;
+    PortBigInteger port1, port2;
 
     [GlobalSetup]
     public void Setup()
@@ -181,15 +189,16 @@ public class BigIntegerDivide
         var bytes2 = new byte[N / 2];
         rnd.NextBytes(bytes1);
         rnd.NextBytes(bytes2);
-        orig1 = new OrigBigInteger(bytes1, isUnsigned: true);
-        orig2 = new OrigBigInteger(bytes2, isUnsigned: true);
-        my1 = new MyBigInteger(bytes1, isUnsigned: true);
-        my2 = new MyBigInteger(bytes2, isUnsigned: true);
+        orig1 = new(bytes1, isUnsigned: true);
+        orig2 = new(bytes2, isUnsigned: true);
+        my1 = new(bytes1, isUnsigned: true);
+        my2 = new(bytes2, isUnsigned: true);
+        port1 = new(bytes1, isUnsigned: true);
+        port2 = new(bytes2, isUnsigned: true);
     }
 
-    [Benchmark(Baseline = true)]
-    public OrigBigInteger Orig() => orig1 / orig2;
+    [Benchmark(Baseline = true)] public OrigBigInteger Orig() => orig1 / orig2;
 
-    [Benchmark]
-    public MyBigInteger New() => my1 / my2;
+    [Benchmark] public MyBigInteger New() => my1 / my2;
+    [Benchmark] public PortBigInteger Port() => port1 / port2;
 }

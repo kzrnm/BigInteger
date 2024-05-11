@@ -4,6 +4,7 @@
 		<TargetFrameworks>net8.0;net7.0</TargetFrameworks>
 		<ImplicitUsings>disable</ImplicitUsings>
 		<Nullable>enable</Nullable>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<RootNamespace>Kzrnm.Numerics</RootNamespace>
 
 		<Version>0.3.2</Version>
@@ -37,7 +38,7 @@
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
-		<PackageReference Include="SourceExpander.Embedder" Version="6.0.0" Condition="'$(Embedding)' == 'true'" >
+		<PackageReference Include="SourceExpander.Embedder" Version="7.0.0" Condition="'$(Embedding)' == 'true'">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>

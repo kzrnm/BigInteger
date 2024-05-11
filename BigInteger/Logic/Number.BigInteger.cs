@@ -1550,12 +1550,6 @@ namespace Kzrnm.Numerics.Logic
 
         private static bool IsDigit(uint ch) => (ch - '0') <= 9;
 
-        internal enum ParsingStatus
-        {
-            OK,
-            Failed,
-            Overflow
-        }
         internal readonly ref struct PowersOf1e9
         {
             // Holds 1000000000^(1<<<n).

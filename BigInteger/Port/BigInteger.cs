@@ -1,42 +1,29 @@
-﻿using Kzrnm.Numerics.Logic;
+// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+
 using System;
 using System.Buffers;
 using System.Buffers.Binary;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
-using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
-namespace Kzrnm.Numerics
+namespace Kzrnm.Numerics.Port
 {
+    [Serializable]
+    [TypeForwardedFrom("System.Numerics, Version=4.0.0.0, PublicKeyToken=b77a5c561934e089")]
     [DebuggerDisplay("{DebuggerDisplay,nq}")]
-    public struct BigInteger
-        : IComparable,
+    public readonly struct BigInteger
+        : ISpanFormattable,
+          IComparable,
           IComparable<BigInteger>,
           IEquatable<BigInteger>,
-          ISpanFormattable,
           IBinaryInteger<BigInteger>,
           ISignedNumber<BigInteger>
     {
-        /*
-         * Original is System.Numerics.BigInteger
-         *
-         * Copyright (c) .NET Foundation and Contributors
-         * Released under the MIT license
-         * https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
-         */
-        internal const string LISENCE = @"
-Original is System.Numerics.BigInteger
-
-Copyright (c) .NET Foundation and Contributors
-Released under the MIT license
-https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
-";
-
         internal const uint kuMaskHighBit = unchecked((uint)int.MinValue);
         internal const int kcbitUint = 32;
         internal const int kcbitUlong = 64;
@@ -392,17 +379,10 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
 
                 // In both of the above cases on big-endian architecture, we need to perform
                 // an endianness swap on the resulting uints.
-                if (!BitConverter.IsLittleEndian)
-                {
-#if NET8_0_OR_GREATER
-                    BinaryPrimitives.ReverseEndianness(val.AsSpan(0, wholeUInt32Count), val);
-#else
-                    foreach (ref var v in val.AsSpan(0, wholeUInt32Count))
-                    {
-                        v = BinaryPrimitives.ReverseEndianness(v);
-                    }
-#endif
-                }
+                //if (!BitConverter.IsLittleEndian)
+                //{
+                //    BinaryPrimitives.ReverseEndianness(val.AsSpan(0, wholeUInt32Count), val);
+                //}
 
                 // Copy the last uint specially if it's not aligned
                 if (unalignedBytes != 0)
@@ -763,8 +743,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             if (trivialDividend && trivialDivisor)
             {
                 BigInteger quotient;
-                quotient = Math.DivRem(dividend._sign, divisor._sign, out int remainder32);
-                remainder = remainder32;
+                (quotient, remainder) = Math.DivRem(dividend._sign, divisor._sign);
                 return quotient;
             }
 
@@ -980,15 +959,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
 
         public static BigInteger ModPow(BigInteger value, BigInteger exponent, BigInteger modulus)
         {
-#if NET8_0_OR_GREATER
-            ArgumentOutOfRangeException.ThrowIfNegative(exponent.Sign);
-#else
-            static void ArgumentOutOfRangeExceptionThrowIfNegative(int v)
-            {
-                if (v < 0) throw new ArgumentOutOfRangeException();
-            }
-            ArgumentOutOfRangeExceptionThrowIfNegative(exponent.Sign);
-#endif
+            ThrowHelper.ThrowIfNegative(exponent.Sign, nameof(exponent));
 
             value.AssertValid();
             exponent.AssertValid();
@@ -1048,15 +1019,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
 
         public static BigInteger Pow(BigInteger value, int exponent)
         {
-#if NET8_0_OR_GREATER
-            ArgumentOutOfRangeException.ThrowIfNegative(exponent);
-#else
-            static void ArgumentOutOfRangeExceptionThrowIfNegative(int v)
-            {
-                if (v < 0) throw new ArgumentOutOfRangeException();
-            }
-            ArgumentOutOfRangeExceptionThrowIfNegative(exponent);
-#endif
+            ThrowHelper.ThrowIfNegative(exponent);
 
             value.AssertValid();
 
@@ -1217,6 +1180,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
                     return _sign < other._sign ? -1 : _sign > other._sign ? +1 : 0;
                 return -other._sign;
             }
+
             if (other._bits == null)
                 return _sign;
 
@@ -1228,9 +1192,9 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
         {
             if (obj == null)
                 return 1;
-            if (obj is BigInteger bigInt)
-                return CompareTo(bigInt);
-            throw new ArgumentException(SR.Argument_MustBeBigInt, nameof(obj));
+            if (obj is not BigInteger bigInt)
+                throw new ArgumentException(SR.Argument_MustBeBigInt, nameof(obj));
+            return CompareTo(bigInt);
         }
 
         /// <summary>
@@ -1604,7 +1568,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             return Number.FormatBigInteger(this, format, NumberFormatInfo.GetInstance(provider));
         }
 
-        internal string DebuggerDisplay
+        private string DebuggerDisplay
         {
             get
             {
@@ -2513,7 +2477,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             if (shift < 0)
                 return value >> -shift;
 
-            int digitShift = Math.DivRem(shift, kcbitUint, out int smallShift);
+            (int digitShift, int smallShift) = Math.DivRem(shift, kcbitUint);
 
             uint[]? xdFromPool = null;
             int xl = value._bits?.Length ?? 1;
@@ -2572,7 +2536,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             if (shift < 0)
                 return value << -shift;
 
-            int digitShift = Math.DivRem(shift, kcbitUint, out int smallShift);
+            (int digitShift, int smallShift) = Math.DivRem(shift, kcbitUint);
 
             BigInteger result;
 
@@ -3151,6 +3115,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
 
         /// <inheritdoc cref="IAdditiveIdentity{TSelf, TResult}.AdditiveIdentity" />
         static BigInteger IAdditiveIdentity<BigInteger, BigInteger>.AdditiveIdentity => Zero;
+
         //
         // IBinaryInteger
         //
@@ -3169,13 +3134,13 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
 
             if (value._bits is null)
             {
-                return BitOperations.LeadingZeroCount((uint)value._sign);
+                return int.LeadingZeroCount(value._sign);
             }
 
             // When the value is positive, we just need to get the lzcnt of the most significant bits
             // Otherwise, we're negative and the most significant bit is always set.
 
-            return (value._sign >= 0) ? BitOperations.LeadingZeroCount(value._bits[^1]) : 0;
+            return (value._sign >= 0) ? uint.LeadingZeroCount(value._bits[^1]) : 0;
         }
 
         /// <inheritdoc cref="IBinaryInteger{TSelf}.PopCount(TSelf)" />
@@ -3185,7 +3150,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
 
             if (value._bits is null)
             {
-                return BitOperations.PopCount((uint)value._sign);
+                return int.PopCount(value._sign);
             }
 
             ulong result = 0;
@@ -3197,7 +3162,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
                 for (int i = 0; i < value._bits.Length; i++)
                 {
                     uint part = value._bits[i];
-                    result += (uint)BitOperations.PopCount(part);
+                    result += uint.PopCount(part);
                 }
             }
             else
@@ -3213,7 +3178,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
                     // Simply process bits, adding the carry while the previous value is zero
 
                     part = ~value._bits[i] + 1;
-                    result += (uint)BitOperations.PopCount(part);
+                    result += uint.PopCount(part);
 
                     i++;
                 }
@@ -3224,7 +3189,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
                     // Then process the remaining bits only utilizing the one's complement
 
                     part = ~value._bits[i];
-                    result += (uint)BitOperations.PopCount(part);
+                    result += uint.PopCount(part);
 
                     i++;
                 }
@@ -3386,7 +3351,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             if (rotateAmount < 0)
                 return RotateLeft(value, -rotateAmount);
 
-            int digitShift = Math.DivRem(rotateAmount, kcbitUint, out int smallShift);
+            (int digitShift, int smallShift) = Math.DivRem(rotateAmount, kcbitUint);
 
             uint[]? xdFromPool = null;
             int xl = value._bits?.Length ?? 1;
@@ -3509,7 +3474,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
 
             if (value._bits is null)
             {
-                return BitOperations.TrailingZeroCount(value._sign);
+                return int.TrailingZeroCount(value._sign);
             }
 
             ulong result = 0;
@@ -3525,10 +3490,11 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
                 result += (sizeof(uint) * 8);
             }
 
-            result += (uint)BitOperations.TrailingZeroCount(part);
+            result += uint.TrailingZeroCount(part);
 
             return result;
         }
+
         /// <inheritdoc cref="IBinaryInteger{TSelf}.TryReadBigEndian(ReadOnlySpan{byte}, bool, out TSelf)" />
         static bool IBinaryInteger<BigInteger>.TryReadBigEndian(ReadOnlySpan<byte> source, bool isUnsigned, out BigInteger value)
         {
@@ -3853,24 +3819,26 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
         {
             value.AssertValid();
 
-            if (value._sign < 0)
+            if (IsNegative(value))
             {
                 ThrowHelper.ThrowValueArgumentOutOfRange_NeedNonNegNumException();
             }
 
             if (value._bits is null)
             {
-                return 31 ^ BitOperations.LeadingZeroCount((uint)(value._sign | 1));
+                return 31 ^ uint.LeadingZeroCount((uint)(value._sign | 1));
             }
 
-            return ((value._bits.Length * 32) - 1) ^ BitOperations.LeadingZeroCount(value._bits[^1]);
+            return ((value._bits.Length * 32) - 1) ^ uint.LeadingZeroCount(value._bits[^1]);
         }
+
         //
         // IMultiplicativeIdentity
         //
 
         /// <inheritdoc cref="IMultiplicativeIdentity{TSelf, TResult}.MultiplicativeIdentity" />
         static BigInteger IMultiplicativeIdentity<BigInteger, BigInteger>.MultiplicativeIdentity => One;
+
         //
         // INumber
         //
@@ -3948,7 +3916,6 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             return value._sign;
         }
 
-
         //
         // INumberBase
         //
@@ -3957,7 +3924,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
         static int INumberBase<BigInteger>.Radix => 2;
 
         /// <inheritdoc cref="INumberBase{TSelf}.CreateChecked{TOther}(TOther)" />
-        [MethodImpl(256)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static BigInteger CreateChecked<TOther>(TOther value)
             where TOther : INumberBase<TOther>
         {
@@ -3976,7 +3943,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
         }
 
         /// <inheritdoc cref="INumberBase{TSelf}.CreateSaturating{TOther}(TOther)" />
-        [MethodImpl(256)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static BigInteger CreateSaturating<TOther>(TOther value)
             where TOther : INumberBase<TOther>
         {
@@ -3995,7 +3962,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
         }
 
         /// <inheritdoc cref="INumberBase{TSelf}.CreateTruncating{TOther}(TOther)" />
-        [MethodImpl(256)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static BigInteger CreateTruncating<TOther>(TOther value)
             where TOther : INumberBase<TOther>
         {
@@ -4145,10 +4112,10 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
         static BigInteger INumberBase<BigInteger>.MinMagnitudeNumber(BigInteger x, BigInteger y) => MinMagnitude(x, y);
 
         /// <inheritdoc cref="INumberBase{TSelf}.TryConvertFromChecked{TOther}(TOther, out TSelf)" />
-        [MethodImpl(256)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static bool INumberBase<BigInteger>.TryConvertFromChecked<TOther>(TOther value, out BigInteger result) => TryConvertFromChecked(value, out result);
 
-        [MethodImpl(256)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static bool TryConvertFromChecked<TOther>(TOther value, out BigInteger result)
             where TOther : INumberBase<TOther>
         {
@@ -4262,10 +4229,10 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
         }
 
         /// <inheritdoc cref="INumberBase{TSelf}.TryConvertFromSaturating{TOther}(TOther, out TSelf)" />
-        [MethodImpl(256)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static bool INumberBase<BigInteger>.TryConvertFromSaturating<TOther>(TOther value, out BigInteger result) => TryConvertFromSaturating(value, out result);
 
-        [MethodImpl(256)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static bool TryConvertFromSaturating<TOther>(TOther value, out BigInteger result)
             where TOther : INumberBase<TOther>
         {
@@ -4379,10 +4346,10 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
         }
 
         /// <inheritdoc cref="INumberBase{TSelf}.TryConvertFromTruncating{TOther}(TOther, out TSelf)" />
-        [MethodImpl(256)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static bool INumberBase<BigInteger>.TryConvertFromTruncating<TOther>(TOther value, out BigInteger result) => TryConvertFromTruncating(value, out result);
 
-        [MethodImpl(256)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static bool TryConvertFromTruncating<TOther>(TOther value, out BigInteger result)
             where TOther : INumberBase<TOther>
         {
@@ -4496,7 +4463,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
         }
 
         /// <inheritdoc cref="INumberBase{TSelf}.TryConvertToChecked{TOther}(TSelf, out TOther)" />
-        [MethodImpl(256)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static bool INumberBase<BigInteger>.TryConvertToChecked<TOther>(BigInteger value, [MaybeNullWhen(false)] out TOther result)
         {
             if (typeof(TOther) == typeof(byte))
@@ -4609,7 +4576,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
         }
 
         /// <inheritdoc cref="INumberBase{TSelf}.TryConvertToSaturating{TOther}(TSelf, out TOther)" />
-        [MethodImpl(256)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static bool INumberBase<BigInteger>.TryConvertToSaturating<TOther>(BigInteger value, [MaybeNullWhen(false)] out TOther result)
         {
             if (typeof(TOther) == typeof(byte))
@@ -4796,7 +4763,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
         }
 
         /// <inheritdoc cref="INumberBase{TSelf}.TryConvertToTruncating{TOther}(TSelf, out TOther)" />
-        [MethodImpl(256)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static bool INumberBase<BigInteger>.TryConvertToTruncating<TOther>(BigInteger value, [MaybeNullWhen(false)] out TOther result)
         {
             if (typeof(TOther) == typeof(byte))
@@ -5184,13 +5151,13 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
                 return false;
             }
         }
+
         //
         // IParsable
         //
 
         /// <inheritdoc cref="IParsable{TSelf}.TryParse(string?, IFormatProvider?, out TSelf)" />
         public static bool TryParse([NotNullWhen(true)] string? s, IFormatProvider? provider, out BigInteger result) => TryParse(s, NumberStyles.Integer, provider, out result);
-
 
         //
         // IShiftOperators
@@ -5285,6 +5252,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
 
         /// <inheritdoc cref="ISignedNumber{TSelf}.NegativeOne" />
         static BigInteger ISignedNumber<BigInteger>.NegativeOne => MinusOne;
+
         //
         // ISpanParsable
         //

@@ -7,7 +7,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace Kzrnm.Numerics.Logic
+namespace Kzrnm.Numerics.Port
 {
     internal static partial class Number
     {
@@ -18,20 +18,26 @@ namespace Kzrnm.Numerics.Logic
         internal const int Int64NumberBufferLength = 19 + 1;    // 19 for the longest input: 9,223,372,036,854,775,807
         internal const int Int128NumberBufferLength = 39 + 1;    // 39 for the longest input: 170,141,183,460,469,231,731,687,303,715,884,105,727
         internal const int SingleNumberBufferLength = 112 + 1 + 1;  // 112 for the longest input + 1 for rounding: 1.40129846E-45
-        internal const int HalfNumberBufferLength = 21; // 19 for the longest input + 1 for rounding (+1 for the null terminator)
+        internal const int HalfNumberBufferLength = 21 + 1 + 1; // 21 for the longest input + 1 for rounding: 0.000122010707855224609375
         internal const int UInt32NumberBufferLength = 10 + 1;   // 10 for the longest input: 4,294,967,295
         internal const int UInt64NumberBufferLength = 20 + 1;   // 20 for the longest input: 18,446,744,073,709,551,615
         internal const int UInt128NumberBufferLength = 39 + 1; // 39 for the longest input: 340,282,366,920,938,463,463,374,607,431,768,211,455
 
-        internal ref struct NumberBuffer
+        internal unsafe ref struct NumberBuffer
         {
             public int DigitsCount;
             public int Scale;
             public bool IsNegative;
             public bool HasNonZeroTail;
             public NumberBufferKind Kind;
-            public Span<byte> Digits;
+            public byte* DigitsPtr;
+            public int DigitsLength;
+            public readonly Span<byte> Digits => new Span<byte>(DigitsPtr, DigitsLength);
 
+            public NumberBuffer(NumberBufferKind kind, byte* digits, int digitsLength) : this(kind, new Span<byte>(digits, digitsLength))
+            {
+                Debug.Assert(digits != null);
+            }
 
             /// <summary>Initializes the NumberBuffer.</summary>
             /// <param name="kind">The kind of the buffer.</param>
@@ -45,7 +51,8 @@ namespace Kzrnm.Numerics.Logic
                 IsNegative = false;
                 HasNonZeroTail = false;
                 Kind = kind;
-                Digits = digits;
+                DigitsPtr = (byte*)Unsafe.AsPointer(ref MemoryMarshal.GetReference(digits)); // Safe since memory must be fixed
+                DigitsLength = digits.Length;
 #if DEBUG
                 Digits.Fill(0xCC);
 #endif
@@ -112,6 +119,14 @@ namespace Kzrnm.Numerics.Logic
 
                 return sb.ToString();
             }
+        }
+
+        internal enum NumberBufferKind : byte
+        {
+            Unknown = 0,
+            Integer = 1,
+            Decimal = 2,
+            FloatingPoint = 3,
         }
     }
 }
