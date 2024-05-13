@@ -1151,7 +1151,8 @@ namespace Kzrnm.Numerics.Logic
                     ? stackalloc uint[BigIntegerCalculator.StackAllocThreshold]
                     : lowerFromPool = ArrayPool<uint>.Shared.Rent(lowerLength)).Slice(0, lowerLength);
 
-                BigIntegerCalculator.Divide(bits, powOfTen, upper, lower, omittedLength);
+                bits.Slice(0, omittedLength).CopyTo(lower);
+                BigIntegerCalculator.Divide(bits.Slice(omittedLength), powOfTen, upper, lower.Slice(omittedLength));
                 Debug.Assert(!upper.Trim(0u).IsEmpty);
 
                 int lowerStrLength = kcchBase * (1 << powersIndex);
