@@ -1,4 +1,5 @@
-﻿using Kzrnm.Numerics.Logic;
+﻿#if NET8_0_OR_GREATER
+using Kzrnm.Numerics.Logic;
 using System.Globalization;
 using System.Numerics;
 
@@ -179,6 +180,7 @@ namespace Kzrnm.Numerics.Test
         }
     }
 
+    [Collection(nameof(DisableParallelization))]
     public class PortBigIntegerThresholdTests : ThresholdTestsBase
     {
         [Fact]
@@ -200,3 +202,4 @@ namespace Kzrnm.Numerics.Test
         }
     }
 }
+#endif

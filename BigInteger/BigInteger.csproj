@@ -31,6 +31,10 @@
 	<PropertyGroup Condition="'$(GITHUB_ACTIONS)' == 'true'">
 		<ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
 	</PropertyGroup>
+	
+	<ItemGroup Condition=" '$(TargetFramework)' == 'net7.0' ">
+		<Compile Remove="Port/*" />
+	</ItemGroup>
 
 	<ItemGroup>
 		<InternalsVisibleTo Include="BigInteger.Test" />

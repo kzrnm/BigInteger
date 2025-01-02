@@ -248,6 +248,7 @@ namespace Kzrnm.Numerics.Test
         }
     }
 
+    [Collection(nameof(DisableParallelization))]
     public class BigIntegerThresholdTests : ThresholdTestsBase
     {
         [Fact]

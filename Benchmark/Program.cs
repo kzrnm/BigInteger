@@ -14,7 +14,9 @@ using System.Runtime.InteropServices;
 
 using MyBigInteger = Kzrnm.Numerics.BigInteger;
 using OrigBigInteger = System.Numerics.BigInteger;
+#if NET8_0_OR_GREATER
 using PortBigInteger = Kzrnm.Numerics.Port.BigInteger;
+#endif
 
 public class BenchmarkConfig : ManualConfig
 {
@@ -67,8 +69,9 @@ public class BigIntegerParse
     [Benchmark(Baseline = true)] public OrigBigInteger Orig() => OrigBigInteger.Parse(s);
 
     [Benchmark] public MyBigInteger New() => MyBigInteger.Parse(s);
-    [Benchmark]
-    public PortBigInteger Port() => PortBigInteger.Parse(s);
+#if NET8_0_OR_GREATER
+    [Benchmark] public PortBigInteger Port() => PortBigInteger.Parse(s);
+#endif
 }
 
 [Config(typeof(BenchmarkConfig))]
@@ -82,7 +85,10 @@ public class BigIntegerToString
 
     MyBigInteger my;
     OrigBigInteger orig;
+#if NET8_0_OR_GREATER
     PortBigInteger port;
+#endif
+
 
     [GlobalSetup]
     public void Setup()
@@ -91,14 +97,18 @@ public class BigIntegerToString
         rnd.NextBytes(bytes);
         orig = new(bytes, isUnsigned: true);
         my = new(bytes, isUnsigned: true);
+#if NET8_0_OR_GREATER
         port = new(bytes, isUnsigned: true);
+#endif
     }
 
     [Benchmark(Baseline = true)]
     public string Orig() => orig.ToString();
 
     [Benchmark] public string New() => my.ToString();
+#if NET8_0_OR_GREATER
     [Benchmark] public string Port() => port.ToString();
+#endif
 }
 
 [Config(typeof(BenchmarkConfig))]
@@ -112,7 +122,9 @@ public class BigIntegerAdd
 
     MyBigInteger my1, my2;
     OrigBigInteger orig1, orig2;
+#if NET8_0_OR_GREATER
     PortBigInteger port1, port2;
+#endif
 
     [GlobalSetup]
     public void Setup()
@@ -125,14 +137,18 @@ public class BigIntegerAdd
         orig2 = new(bytes2, isUnsigned: true);
         my1 = new(bytes1, isUnsigned: true);
         my2 = new(bytes2, isUnsigned: true);
+#if NET8_0_OR_GREATER
         port1 = new(bytes1, isUnsigned: true);
         port2 = new(bytes2, isUnsigned: true);
+#endif
     }
 
     [Benchmark(Baseline = true)] public OrigBigInteger Orig() => orig1 + orig2;
 
     [Benchmark] public MyBigInteger New() => my1 + my2;
+#if NET8_0_OR_GREATER
     [Benchmark] public PortBigInteger Port() => port1 + port2;
+#endif
 }
 
 [Config(typeof(BenchmarkConfig))]
@@ -146,7 +162,9 @@ public class BigIntegerMultiply
 
     MyBigInteger my1, my2;
     OrigBigInteger orig1, orig2;
+#if NET8_0_OR_GREATER
     PortBigInteger port1, port2;
+#endif
 
     [GlobalSetup]
     public void Setup()
@@ -159,14 +177,18 @@ public class BigIntegerMultiply
         orig2 = new(bytes2, isUnsigned: true);
         my1 = new(bytes1, isUnsigned: true);
         my2 = new(bytes2, isUnsigned: true);
+#if NET8_0_OR_GREATER
         port1 = new(bytes1, isUnsigned: true);
         port2 = new(bytes2, isUnsigned: true);
+#endif
     }
 
     [Benchmark(Baseline = true)] public OrigBigInteger Orig() => orig1 * orig2;
 
     [Benchmark] public MyBigInteger New() => my1 * my2;
+#if NET8_0_OR_GREATER
     [Benchmark] public PortBigInteger Port() => port1 * port2;
+#endif
 }
 
 [Config(typeof(BenchmarkConfig))]
@@ -180,7 +202,9 @@ public class BigIntegerDivide
 
     MyBigInteger my1, my2;
     OrigBigInteger orig1, orig2;
+#if NET8_0_OR_GREATER
     PortBigInteger port1, port2;
+#endif
 
     [GlobalSetup]
     public void Setup()
@@ -193,12 +217,16 @@ public class BigIntegerDivide
         orig2 = new(bytes2, isUnsigned: true);
         my1 = new(bytes1, isUnsigned: true);
         my2 = new(bytes2, isUnsigned: true);
+#if NET8_0_OR_GREATER
         port1 = new(bytes1, isUnsigned: true);
         port2 = new(bytes2, isUnsigned: true);
+#endif
     }
 
     [Benchmark(Baseline = true)] public OrigBigInteger Orig() => orig1 / orig2;
 
     [Benchmark] public MyBigInteger New() => my1 / my2;
+#if NET8_0_OR_GREATER
     [Benchmark] public PortBigInteger Port() => port1 / port2;
+#endif
 }

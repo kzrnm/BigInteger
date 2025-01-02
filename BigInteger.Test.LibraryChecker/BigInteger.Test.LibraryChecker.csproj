@@ -18,6 +18,8 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <Folder Include="Properties\" />
+		<Folder Include="Properties\" />
+		<Compile Remove="**/PortBigInteger.cs" Condition="'$(TargetFramework)' == 'net7.0'" />
+		<None Include="**/PortBigInteger.cs" Condition="'$(TargetFramework)' == 'net7.0'" />
 	</ItemGroup>
 </Project>
