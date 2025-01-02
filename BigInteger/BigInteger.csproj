@@ -7,9 +7,13 @@
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<RootNamespace>Kzrnm.Numerics</RootNamespace>
 
-		<Version>0.3.2</Version>
-		<AssemblyVersion>0.3.2.101</AssemblyVersion>
-		<AssemblyVersion Condition="'$(Embedding)' == 'true'">$([System.Version]::Parse($(AssemblyVersion)).Major).$([System.Version]::Parse($(AssemblyVersion)).Minor).$([System.Version]::Parse($(AssemblyVersion)).Build).$([MSBuild]::Add(1000, $([System.Version]::Parse($(AssemblyVersion)).Revision)))</AssemblyVersion>
+		<VersionPrefix>0.3.3</VersionPrefix>
+		<VersionSuffix></VersionSuffix>
+		<VersionSuffix Condition="'$(Embedding)' == 'true'">embedded</VersionSuffix>
+
+		<AssemblyVersion>$(VersionPrefix).1</AssemblyVersion>
+		<AssemblyVersion Condition="'$(Embedding)' == 'true'">$(VersionPrefix).1001</AssemblyVersion>
+
 		<DefineConstants Condition="'$(Embedding)' == 'true'">$(DefineConstants);Embedding</DefineConstants>
 
 		<PackageTags>BigInteger</PackageTags>

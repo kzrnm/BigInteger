@@ -36,10 +36,8 @@ jobs:
     strategy:
       matrix:
         target:
-          - version: ${{needs.get-version.outputs.version}}
-            configuration: Release
-          - version: ${{needs.get-version.outputs.version}}-embedded
-            configuration: Debug
+          - configuration: Release
+          - configuration: Debug
             property: -property:Embedding=true
     steps:
       - uses: actions/checkout@v4
@@ -56,11 +54,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nuget-
       - name: Build
-        run: dotnet build ${{ env.WORKFLOW_BUILD_SLN }} -c ${{ matrix.target.configuration }} -p:Version=${{ matrix.target.version }} ${{ matrix.target.property }}
+        run: dotnet build ${{ env.WORKFLOW_BUILD_SLN }} -c ${{ matrix.target.configuration }} ${{ matrix.target.property }}
       - name: Test
-        run: dotnet test ${{ env.WORKFLOW_BUILD_SLN }} --no-build --logger GitHubActions -c ${{ matrix.target.configuration }}
+        run: dotnet test ${{ env.WORKFLOW_BUILD_SLN }} --no-build --logger GitHubActions -c ${{ matrix.target.configuration }} ${{ matrix.target.property }}
       - name: Pack
-        run: dotnet pack ${{ env.PACK_CSPROJ }} --no-build -c ${{ matrix.target.configuration }} -o bin/Packages/${{ matrix.target.configuration }} -p:Version=${{ matrix.target.version }}
+        run: dotnet pack ${{ env.PACK_CSPROJ }} --no-build -c ${{ matrix.target.configuration }} -o bin/Packages/${{ matrix.target.configuration }} ${{ matrix.target.property }}
       - uses: actions/upload-artifact@v4
         with:
           name: dist-${{ matrix.target.configuration }}
