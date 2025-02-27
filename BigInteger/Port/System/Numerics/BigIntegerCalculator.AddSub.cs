@@ -130,7 +130,7 @@ namespace Kzrnm.Numerics.Port
             Subtract(left, bits, ref resultPtr, startIndex: i, initialCarry: carry);
         }
 
-        private static void SubtractSelf(Span<uint> left, ReadOnlySpan<uint> right)
+        public static void SubtractSelf(Span<uint> left, ReadOnlySpan<uint> right)
         {
             Debug.Assert(left.Length >= right.Length);
 

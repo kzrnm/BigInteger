@@ -17,7 +17,6 @@ namespace Kzrnm.Numerics.Port
             Debug.Assert(str != null);
             Debug.Assert(strEnd != null);
             Debug.Assert(str <= strEnd);
-            Debug.Assert((styles & (NumberStyles.AllowHexSpecifier)) == 0);
 
             const int StateSign = 0x0001;
             const int StateParens = 0x0002;
@@ -106,7 +105,7 @@ namespace Kzrnm.Numerics.Port
                     {
                         if (digCount < maxDigCount)
                         {
-                            number.Digits[digCount] = (byte)ch;
+                            number.Digits[digCount] = (char)ch;
                             if ((ch != '0') || (number.Kind != NumberBufferKind.Integer))
                             {
                                 digEnd = digCount + 1;
@@ -167,7 +166,7 @@ namespace Kzrnm.Numerics.Port
 
             bool negExp = false;
             number.DigitsCount = digEnd;
-            number.Digits[digEnd] = (byte)'\0';
+            number.Digits[digEnd] = (char)'\0';
             if ((state & StateDigits) != 0)
             {
                 if ((ch == 'E' || ch == 'e') && ((styles & NumberStyles.AllowExponent) != 0))
@@ -228,7 +227,7 @@ namespace Kzrnm.Numerics.Port
                         numberOfTrailingZeros = Math.Min(numberOfTrailingZeros, numberOfFractionalDigits);
                         Debug.Assert(numberOfTrailingZeros >= 0);
                         number.DigitsCount = digEnd - numberOfTrailingZeros;
-                        number.Digits[number.DigitsCount] = (byte)'\0';
+                        number.Digits[number.DigitsCount] = (char)'\0';
                     }
                 }
 
@@ -304,7 +303,7 @@ namespace Kzrnm.Numerics.Port
             where TChar : unmanaged, IUtfChar<TChar>
         {
             // For compatibility, we need to allow trailing zeros at the end of a number string
-            return value.Slice(index).Trim(TChar.CastFrom('\0')).Length == 0;
+            return value.Slice(index).IndexOfAnyExcept(TChar.CastFrom('\0')) < 0;
         }
 
         private static bool IsWhite(uint ch) => (ch == 0x20) || ((ch - 0x09) <= (0x0D - 0x09));

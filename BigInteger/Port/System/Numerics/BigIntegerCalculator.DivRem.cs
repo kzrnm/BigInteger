@@ -20,7 +20,7 @@ namespace Kzrnm.Numerics.Port
 
         public static void Divide(ReadOnlySpan<uint> left, uint right, Span<uint> quotient, out uint remainder)
         {
-            DummyForDebug(quotient);
+            InitializeForDebug(quotient);
             ulong carry = 0UL;
             Divide(left, right, quotient, ref carry);
             remainder = (uint)carry;
@@ -28,7 +28,7 @@ namespace Kzrnm.Numerics.Port
 
         public static void Divide(ReadOnlySpan<uint> left, uint right, Span<uint> quotient)
         {
-            DummyForDebug(quotient);
+            InitializeForDebug(quotient);
             ulong carry = 0UL;
             Divide(left, right, quotient, ref carry);
         }
@@ -37,7 +37,7 @@ namespace Kzrnm.Numerics.Port
         {
             Debug.Assert(left.Length >= 1);
             Debug.Assert(quotient.Length == left.Length);
-            DummyForDebug(quotient);
+            InitializeForDebug(quotient);
 
             // Executes the division for one big and one 32-bit integer.
             // Thus, we've similar code than below, but there is no loop for
@@ -74,8 +74,8 @@ namespace Kzrnm.Numerics.Port
             Debug.Assert(left.Length >= right.Length);
             Debug.Assert(quotient.Length == left.Length - right.Length + 1);
             Debug.Assert(remainder.Length == left.Length);
-            DummyForDebug(quotient);
-            DummyForDebug(remainder);
+            InitializeForDebug(quotient);
+            InitializeForDebug(remainder);
 
             if (right.Length < DivideBurnikelZieglerThreshold || left.Length - right.Length < DivideBurnikelZieglerThreshold)
             {
@@ -83,7 +83,9 @@ namespace Kzrnm.Numerics.Port
                 DivideGrammarSchool(remainder, right, quotient);
             }
             else
+            {
                 DivideBurnikelZiegler(left, right, quotient, remainder);
+            }
         }
 
         public static void Divide(ReadOnlySpan<uint> left, ReadOnlySpan<uint> right, Span<uint> quotient)
@@ -92,7 +94,7 @@ namespace Kzrnm.Numerics.Port
             Debug.Assert(right.Length >= 1);
             Debug.Assert(left.Length >= right.Length);
             Debug.Assert(quotient.Length == left.Length - right.Length + 1);
-            DummyForDebug(quotient);
+            InitializeForDebug(quotient);
 
             if (right.Length < DivideBurnikelZieglerThreshold || left.Length - right.Length < DivideBurnikelZieglerThreshold)
             {
@@ -113,8 +115,9 @@ namespace Kzrnm.Numerics.Port
                     ArrayPool<uint>.Shared.Return(leftCopyFromPool);
             }
             else
+            {
                 DivideBurnikelZiegler(left, right, quotient, default);
-
+            }
         }
 
         public static void Remainder(ReadOnlySpan<uint> left, ReadOnlySpan<uint> right, Span<uint> remainder)
@@ -123,7 +126,7 @@ namespace Kzrnm.Numerics.Port
             Debug.Assert(right.Length >= 1);
             Debug.Assert(left.Length >= right.Length);
             Debug.Assert(remainder.Length == left.Length);
-            DummyForDebug(remainder);
+            InitializeForDebug(remainder);
 
             if (right.Length < DivideBurnikelZieglerThreshold || left.Length - right.Length < DivideBurnikelZieglerThreshold)
             {
@@ -148,20 +151,26 @@ namespace Kzrnm.Numerics.Port
             }
         }
 
+        /// <summary>
+        /// Logically equivalent to the following code.
+        /// <code>
+        /// quotient = left / right;
+        /// left %= right;
+        /// </code>
+        /// </summary>
         private static void DivRem(Span<uint> left, ReadOnlySpan<uint> right, Span<uint> quotient)
         {
-            // quotient = left / right;
-            // left %= right;
-
             Debug.Assert(left.Length >= 1);
             Debug.Assert(right.Length >= 1);
             Debug.Assert(left.Length >= right.Length);
             Debug.Assert(quotient.Length == left.Length - right.Length + 1
                 || quotient.Length == 0);
-            DummyForDebug(quotient);
+            InitializeForDebug(quotient);
 
             if (right.Length < DivideBurnikelZieglerThreshold || left.Length - right.Length < DivideBurnikelZieglerThreshold)
+            {
                 DivideGrammarSchool(left, right, quotient);
+            }
             else
             {
                 uint[]? leftCopyFromPool = null;
@@ -185,7 +194,9 @@ namespace Kzrnm.Numerics.Port
                                 : quotientActualFromPool = ArrayPool<uint>.Shared.Rent(quotientLength)).Slice(0, quotientLength);
                 }
                 else
+                {
                     quotientActual = quotient;
+                }
 
                 DivideBurnikelZiegler(leftCopy, right, quotientActual, left);
 
@@ -363,7 +374,7 @@ namespace Kzrnm.Numerics.Port
                 // m = min{1<<k|(1<<k) * DivideBurnikelZieglerThreshold > right.Length}
                 int m = (int)BitOperations.RoundUpToPowerOf2((uint)right.Length / (uint)DivideBurnikelZieglerThreshold + 1);
 
-                int j = (right.Length + m - 1) / m; // Ceil((right.Length+rightOmmited)/m)
+                int j = (right.Length + m - 1) / m; // Ceil(right.Length/m)
                 n = j * m;
             }
 
@@ -406,12 +417,14 @@ namespace Kzrnm.Numerics.Port
                     // Left shift
                     int carryShift = 32 - sigmaSmall;
                     uint carry = 0;
+
                     for (int i = 0; i < bits.Length; i++)
                     {
                         uint carryTmp = bits[i] >> carryShift;
                         bits[i] = bits[i] << sigmaSmall | carry;
                         carry = carryTmp;
                     }
+
                     Debug.Assert(carry == 0);
                 }
             }
@@ -445,7 +458,7 @@ namespace Kzrnm.Numerics.Port
 
                 BurnikelZieglerD2n1n(z, b, q, r);
 
-                Debug.Assert(q.Slice(quotientUpper.Length).Trim(0u).Length == 0);
+                Debug.Assert(q.Slice(quotientUpper.Length).IndexOfAnyExcept(0u) < 0);
                 q.Slice(0, quotientUpper.Length).CopyTo(quotientUpper);
 
                 if (qFromPool != null)
@@ -472,7 +485,7 @@ namespace Kzrnm.Numerics.Port
                 ArrayPool<uint>.Shared.Return(aFromPool);
 
             Debug.Assert(r[^1] == 0);
-            Debug.Assert(r.Slice(0, sigmaDigit).Trim(0u).Length == 0);
+            Debug.Assert(r.Slice(0, sigmaDigit).IndexOfAnyExcept(0u) < 0);
             if (remainder.Length != 0)
             {
                 Span<uint> rt = r.Slice(sigmaDigit);
@@ -482,17 +495,22 @@ namespace Kzrnm.Numerics.Port
                 {
                     // Right shift
                     Debug.Assert((uint)sigmaSmall <= 32);
+
                     int carryShift = 32 - sigmaSmall;
                     uint carry = 0;
+
                     for (int i = rt.Length - 1; i >= 0; i--)
                     {
                         remainder[i] = rt[i] >> sigmaSmall | carry;
                         carry = rt[i] << carryShift;
                     }
+
                     Debug.Assert(carry == 0);
                 }
                 else
+                {
                     rt.CopyTo(remainder);
+                }
             }
 
             if (rFromPool != null)
@@ -564,7 +582,7 @@ namespace Kzrnm.Numerics.Port
                 }
                 else
                 {
-                    Debug.Assert(r1.Slice(remainder.Length).Trim(0u).Length == 0);
+                    Debug.Assert(r1.Slice(remainder.Length).IndexOfAnyExcept(0u) < 0);
                     r1.Slice(0, remainder.Length).CopyTo(remainder);
                 }
 
@@ -672,10 +690,7 @@ namespace Kzrnm.Numerics.Port
                 right = right.Slice(0, ActualLength(right));
                 bits = bits.Slice(0, left.Length + right.Length);
 
-                if (left.Length < right.Length)
-                    Multiply(right, left, bits);
-                else
-                    Multiply(left, right, bits);
+                Multiply(left, right, bits);
             }
         }
     }

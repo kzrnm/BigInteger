@@ -10,8 +10,8 @@ namespace Kzrnm.Numerics.Test.DivRem
             int n = cr.Int();
             while (--n >= 0)
             {
-                var a = BigInteger.Parse(cr.Ascii(), null);
-                var b = BigInteger.Parse(cr.Ascii(), null);
+                var a = BigInteger.Parse(cr.StringChars(), null);
+                var b = BigInteger.Parse(cr.StringChars(), null);
 
                 var quotient = BigInteger.DivRem(a, b, out var remainder);
 

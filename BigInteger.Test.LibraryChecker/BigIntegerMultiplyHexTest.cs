@@ -11,8 +11,8 @@ namespace Kzrnm.Numerics.Test
             int n = cr.Int();
             while (--n >= 0)
             {
-                var a = ParseHex<T>(cr.AsciiChars());
-                var b = ParseHex<T>(cr.AsciiChars());
+                var a = ParseHex<T>(cr.StringChars());
+                var b = ParseHex<T>(cr.StringChars());
                 cw.WriteLine(FormatHex(a * b));
             }
         }

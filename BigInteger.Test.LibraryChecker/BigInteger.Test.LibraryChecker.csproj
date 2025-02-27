@@ -2,7 +2,7 @@
 
 	<PropertyGroup>
 		<OutputType>Exe</OutputType>
-		<TargetFrameworks>net8.0;net7.0</TargetFrameworks>
+		<TargetFrameworks>net9.0;net8.0;net7.0</TargetFrameworks>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 		<RootNamespace>Kzrnm.Numerics.Test</RootNamespace>
@@ -13,13 +13,11 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Competitive.IO" Version="2.1.0" />
+		<PackageReference Include="Competitive.IO" Version="3.0.0" />
 		<PackageReference Include="CompetitiveVerifierProblem" Version="2.0.0" />
 	</ItemGroup>
 
 	<ItemGroup>
 		<Folder Include="Properties\" />
-		<Compile Remove="**/PortBigInteger.cs" Condition="'$(TargetFramework)' == 'net7.0'" />
-		<None Include="**/PortBigInteger.cs" Condition="'$(TargetFramework)' == 'net7.0'" />
 	</ItemGroup>
 </Project>

@@ -82,9 +82,21 @@ namespace Kzrnm.Numerics.Test
             {
                 for (int k = 0; k < 60; k++)
                 {
-                    var s = Enumerable.Repeat(rnd, len).Select(rnd => HexConverter.ToCharUpper(rnd.Next())).ToArray();
+                    var s = Enumerable.Repeat(rnd, len).Select(rnd => ToCharUpper(rnd.Next())).ToArray();
                     Equal(BigInteger.Parse(s, NumberStyles.HexNumber), OrigBigInteger.Parse(s, NumberStyles.HexNumber));
                 }
+            }
+            static char ToCharUpper(int value)
+            {
+                value &= 0xF;
+                value += '0';
+
+                if (value > '9')
+                {
+                    value += ('A' - ('9' + 1));
+                }
+
+                return (char)value;
             }
         }
 

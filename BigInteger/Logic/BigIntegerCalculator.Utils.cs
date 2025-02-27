@@ -6,12 +6,7 @@ using System.Diagnostics;
 
 namespace Kzrnm.Numerics.Logic
 {
-#if Embedding
-    public
-#else
-    internal
-#endif
-    static partial class BigIntegerCalculator
+    internal static partial class BigIntegerCalculator
     {
 #if DEBUG
         // Mutable for unit testing...
@@ -23,8 +18,8 @@ namespace Kzrnm.Numerics.Logic
 
         public static int Compare(ReadOnlySpan<uint> left, ReadOnlySpan<uint> right)
         {
-            Debug.Assert(left.Length <= right.Length || left.Slice(right.Length).Trim(0u).Length > 0);
-            Debug.Assert(left.Length >= right.Length || right.Slice(left.Length).Trim(0u).Length > 0);
+            Debug.Assert(left.Length <= right.Length || left.Slice(right.Length).IndexOfAnyExcept(0u) >= 0);
+            Debug.Assert(left.Length >= right.Length || right.Slice(left.Length).IndexOfAnyExcept(0u) >= 0);
 
             if (left.Length != right.Length)
                 return left.Length < right.Length ? -1 : 1;
@@ -83,7 +78,7 @@ namespace Kzrnm.Numerics.Logic
         }
 
         [Conditional("DEBUG")]
-        public static void DummyForDebug(Span<uint> bits)
+        public static void InitializeForDebug(Span<uint> bits)
         {
             // Reproduce the case where the return value of `stackalloc uint` is not initialized to zero.
             bits.Fill(0xCD);

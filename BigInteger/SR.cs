@@ -24,7 +24,10 @@ namespace Kzrnm.Numerics
         public static void ThrowIfNegative<T>(T value, [CallerArgumentExpression(nameof(value))] string? paramName = null)
             where T : INumberBase<T>
         {
-            if (T.IsNegative(value)) throw new ArgumentOutOfRangeException(paramName, value, SR.Format("SR.ArgumentOutOfRange_Generic_MustBeNonNegative", paramName, value));
+            if (T.IsNegative(value))
+                Throw(paramName, value);
+            void Throw(string? paramName, T value)
+                => throw new ArgumentOutOfRangeException(paramName, value, "MustBeNonNegative");
         }
 
         [DoesNotReturn]

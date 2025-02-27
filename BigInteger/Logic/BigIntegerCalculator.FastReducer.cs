@@ -6,7 +6,7 @@ using System.Diagnostics;
 
 namespace Kzrnm.Numerics.Logic
 {
-    static partial class BigIntegerCalculator
+    internal static partial class BigIntegerCalculator
     {
         // If we need to reduce by a certain modulus again and again, it's much
         // more efficient to do this with multiplication operations. This is

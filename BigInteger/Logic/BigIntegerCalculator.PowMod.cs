@@ -7,7 +7,7 @@ using System.Diagnostics;
 
 namespace Kzrnm.Numerics.Logic
 {
-    static partial class BigIntegerCalculator
+    internal static partial class BigIntegerCalculator
     {
         // Executes different exponentiation algorithms, which are
         // based on the classic square-and-multiply method.

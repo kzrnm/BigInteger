@@ -34,14 +34,15 @@ namespace Kzrnm.Numerics.Port
     internal readonly struct Utf16Char(char ch) : IUtfChar<Utf16Char>
 #pragma warning restore CA1067
     {
-        private readonly char value = ch;
+        readonly char value = ch;
 #else
-#pragma warning disable CA1067 // Polyfill only type
     internal readonly struct Utf16Char : IUtfChar<Utf16Char>
-#pragma warning restore CA1067
     {
-        public Utf16Char(char ch) => value = ch;
-        private readonly char value;
+        public Utf16Char(char ch)
+        {
+            value = ch;
+        }
+        readonly char value;
 #endif
 
         public static Utf16Char CastFrom(byte value) => new((char)value);
@@ -58,15 +59,17 @@ namespace Kzrnm.Numerics.Port
     internal readonly struct Utf8Char(byte ch) : IUtfChar<Utf8Char>
 #pragma warning restore CA1067
     {
-        private readonly byte value = ch;
+        readonly byte value = ch;
 #else
-#pragma warning disable CA1067 // Polyfill only type
     internal readonly struct Utf8Char : IUtfChar<Utf8Char>
-#pragma warning restore CA1067
     {
-        public Utf8Char(byte ch) => value = ch;
-        private readonly byte value;
+        public Utf8Char(byte ch)
+        {
+            value = ch;
+        }
+        readonly byte value;
 #endif
+
         public static Utf8Char CastFrom(byte value) => new(value);
         public static Utf8Char CastFrom(char value) => new((byte)value);
         public static Utf8Char CastFrom(int value) => new((byte)value);

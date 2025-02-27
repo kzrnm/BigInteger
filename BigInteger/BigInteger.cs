@@ -981,7 +981,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
         public static BigInteger ModPow(BigInteger value, BigInteger exponent, BigInteger modulus)
         {
 #if NET8_0_OR_GREATER
-            ArgumentOutOfRangeException.ThrowIfNegative(exponent.Sign);
+            ThrowHelper.ThrowIfNegative(exponent.Sign);
 #else
             static void ArgumentOutOfRangeExceptionThrowIfNegative(int v)
             {
@@ -1049,7 +1049,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
         public static BigInteger Pow(BigInteger value, int exponent)
         {
 #if NET8_0_OR_GREATER
-            ArgumentOutOfRangeException.ThrowIfNegative(exponent);
+            ThrowHelper.ThrowIfNegative(exponent);
 #else
             static void ArgumentOutOfRangeExceptionThrowIfNegative(int v)
             {

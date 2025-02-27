@@ -11,8 +11,8 @@ namespace Kzrnm.Numerics.Test
             int n = cr.Int();
             while (--n >= 0)
             {
-                var a = T.Parse(cr.Ascii(), null);
-                var b = T.Parse(cr.Ascii(), null);
+                var a = T.Parse(cr.StringChars(), null);
+                var b = T.Parse(cr.StringChars(), null);
 
                 cw.WriteLine(a * b);
             }

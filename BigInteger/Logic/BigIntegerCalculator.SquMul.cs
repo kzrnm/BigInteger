@@ -9,7 +9,7 @@ using System.Runtime.InteropServices;
 
 namespace Kzrnm.Numerics.Logic
 {
-    static partial class BigIntegerCalculator
+    internal static partial class BigIntegerCalculator
     {
 #if DEBUG
         // Mutable for unit testing...
@@ -132,10 +132,6 @@ namespace Kzrnm.Numerics.Logic
         public static void Multiply(ReadOnlySpan<uint> left, uint right, Span<uint> bits)
         {
             Debug.Assert(bits.Length == left.Length + 1);
-#if DEBUG
-            // Fill bits with dummy
-            bits.Fill(0xAB);
-#endif
 
             // Executes the multiplication for one big and one 32-bit integer.
             // Since every step holds the already slightly familiar equation
@@ -160,8 +156,7 @@ namespace Kzrnm.Numerics.Logic
 #else
         internal const
 #endif
-        int MultiplyKaratsubaThreshold = 32;
-
+            int MultiplyKaratsubaThreshold = 32;
         public static void Multiply(ReadOnlySpan<uint> left, ReadOnlySpan<uint> right, Span<uint> bits)
         {
             Debug.Assert(left.Length >= right.Length);
@@ -333,6 +328,7 @@ namespace Kzrnm.Numerics.Logic
                 }
             }
 
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             static void Naive(ReadOnlySpan<uint> left, ReadOnlySpan<uint> right, Span<uint> bits)
             {
                 Debug.Assert(right.Length < MultiplyKaratsubaThreshold);

@@ -80,21 +80,11 @@ namespace Kzrnm.Numerics.Port
                 if (left.Length > k)
                 {
                     left = left.Slice(k);
+                    bits = bits.Slice(0, left.Length + right.Length);
 
-                    if (left.Length < right.Length)
-                    {
-                        Multiply(right,
-                                 left,
-                                 bits.Slice(0, left.Length + right.Length));
-                    }
-                    else
-                    {
-                        Multiply(left,
-                                 right,
-                                 bits.Slice(0, left.Length + right.Length));
-                    }
+                    Multiply(left, right, bits);
 
-                    return ActualLength(bits.Slice(0, left.Length + right.Length));
+                    return ActualLength(bits);
                 }
 
                 return 0;

@@ -1,7 +1,6 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-using Kzrnm.Numerics.Logic;
 using System;
 using System.Buffers;
 using System.Collections.Generic;
@@ -20,7 +19,11 @@ namespace Kzrnm.Numerics.Port
                                                            | NumberStyles.AllowLeadingSign | NumberStyles.AllowTrailingSign
                                                            | NumberStyles.AllowParentheses | NumberStyles.AllowDecimalPoint
                                                            | NumberStyles.AllowThousands | NumberStyles.AllowExponent
-                                                           | NumberStyles.AllowCurrencySymbol);
+                                                           | NumberStyles.AllowCurrencySymbol | NumberStyles.AllowHexSpecifier
+#if NET8_0_OR_GREATER
+                                                           | NumberStyles.AllowBinarySpecifier
+#endif
+        );
 
         private static ReadOnlySpan<uint> UInt32PowersOfTen => new uint[] { 1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000 };
 
@@ -42,6 +45,14 @@ namespace Kzrnm.Numerics.Port
                 e = new ArgumentException(SR.Argument_InvalidNumberStyles, nameof(style));
                 return false;
             }
+            if ((style & NumberStyles.AllowHexSpecifier) != 0)
+            { // Check for hex number
+                if ((style & ~NumberStyles.HexNumber) != 0)
+                {
+                    e = new ArgumentException(SR.Argument_InvalidHexStyle, nameof(style));
+                    return false;
+                }
+            }
             e = null;
             return true;
         }
@@ -53,31 +64,37 @@ namespace Kzrnm.Numerics.Port
                 throw e; // TryParse still throws ArgumentException on invalid NumberStyles
             }
 
+            if ((style & NumberStyles.AllowHexSpecifier) != 0)
+            {
+                return TryParseBigIntegerHexOrBinaryNumberStyle<BigIntegerHexParser<char>, char>(value, style, out result);
+            }
+
+#if NET8_0_OR_GREATER
+            if ((style & NumberStyles.AllowBinarySpecifier) != 0)
+            {
+                return TryParseBigIntegerHexOrBinaryNumberStyle<BigIntegerBinaryParser<char>, char>(value, style, out result);
+            }
+#endif
+
             return TryParseBigIntegerNumber(value, style, info, out result);
         }
 
         internal static unsafe ParsingStatus TryParseBigIntegerNumber(ReadOnlySpan<char> value, NumberStyles style, NumberFormatInfo info, out BigInteger result)
         {
-            scoped Span<byte> buffer;
-            byte[]? arrayFromPool = null;
-
             if (value.Length == 0)
             {
                 result = default;
                 return ParsingStatus.Failed;
             }
-            if (value.Length < 255)
-            {
-                buffer = stackalloc byte[value.Length + 1 + 1];
-            }
-            else
-            {
-                buffer = arrayFromPool = ArrayPool<byte>.Shared.Rent(value.Length + 1 + 1);
-            }
+
+            char[]? arrayFromPool = null;
+            Span<char> buffer = value.Length < 255
+                ? stackalloc char[value.Length + 1 + 1]
+                : (arrayFromPool = ArrayPool<char>.Shared.Rent(value.Length + 1 + 1));
 
             ParsingStatus ret;
 
-            fixed (byte* ptr = buffer) // NumberBuffer expects pinned span
+            fixed (char* ptr = buffer) // NumberBuffer expects pinned span
             {
                 NumberBuffer number = new NumberBuffer(NumberBufferKind.Integer, buffer);
 
@@ -94,7 +111,7 @@ namespace Kzrnm.Numerics.Port
 
             if (arrayFromPool != null)
             {
-                ArrayPool<byte>.Shared.Return(arrayFromPool);
+                ArrayPool<char>.Shared.Return(arrayFromPool);
             }
 
             return ret;
@@ -205,7 +222,7 @@ namespace Kzrnm.Numerics.Port
                 else
                 {
                     // -1 << 32, which requires an additional uint
-                    result = new BigInteger(-1, new uint[] { 0, 1 });
+                    result = new BigInteger(-1, new[] { 0u, 1u });
                     return ParsingStatus.OK;
                 }
             }
@@ -234,7 +251,7 @@ namespace Kzrnm.Numerics.Port
             if (signBits != 0)
             {
                 // For negative values, negate the whole array
-                if (bits.AsSpan().Trim(0u).Length == 0)
+                if (bits.AsSpan().IndexOfAnyExcept(0u) >= 0)
                 {
                     NumericsHelpers.DangerousMakeTwosComplement(bits);
                 }
@@ -276,9 +293,9 @@ namespace Kzrnm.Numerics.Port
         //
 #if DEBUG
         // Mutable for unit testing...
-        internal static
+        public static
 #else
-        internal const
+        public const
 #endif
         int
             BigIntegerParseNaiveThreshold = 1233,
@@ -302,12 +319,12 @@ namespace Kzrnm.Numerics.Port
             scoped Span<uint> base1E9;
 
             {
-                ReadOnlySpan<byte> intDigits = number.Digits.Slice(0, Math.Min(number.Scale, number.DigitsCount));
-                int intDigitsEnd = intDigits.IndexOf<byte>(0);
+                ReadOnlySpan<char> intDigits = number.Digits.Slice(0, Math.Min(number.Scale, number.DigitsCount));
+                int intDigitsEnd = intDigits.IndexOf('\0');
                 if (intDigitsEnd < 0)
                 {
                     // Check for nonzero digits after the decimal point.
-                    ReadOnlySpan<byte> fracDigitsSpan = number.Digits.Slice(intDigits.Length);
+                    var fracDigitsSpan = number.Digits.Slice(intDigits.Length);
                     foreach (byte digitChar in fracDigitsSpan)
                     {
                         if (digitChar == '\0')
@@ -329,36 +346,27 @@ namespace Kzrnm.Numerics.Port
                     base1E9Length <= BigIntegerCalculator.StackAllocThreshold
                     ? stackalloc uint[BigIntegerCalculator.StackAllocThreshold]
                     : base1E9FromPool = ArrayPool<uint>.Shared.Rent(base1E9Length)).Slice(0, base1E9Length);
-                base1E9.Clear();
 
-                int di = base1E9Length - 1;
-                ReadOnlySpan<byte> leadingDigits = intDigits[..(intDigits.Length % PowersOf1e9.MaxPartialDigits)];
-
+                int di = base1E9Length;
+                var leadingDigits = intDigits[..(intDigits.Length % PowersOf1e9.MaxPartialDigits)];
                 if (leadingDigits.Length != 0)
                 {
-                    foreach (byte d in leadingDigits)
-                    {
-                        base1E9[di] = 10 * base1E9[di] + (uint)(d - '0');
-                    }
-                    --di;
+                    uint.TryParse(leadingDigits, out base1E9[--di]);
                 }
 
                 intDigits = intDigits.Slice(leadingDigits.Length);
                 Debug.Assert(intDigits.Length % PowersOf1e9.MaxPartialDigits == 0);
 
-                for (; di >= 0; --di)
+                for (--di; di >= 0; --di)
                 {
-                    foreach (byte d in intDigits.Slice(0, PowersOf1e9.MaxPartialDigits))
-                    {
-                        base1E9[di] = 10 * base1E9[di] + (uint)(d - '0');
-                    }
+                    uint.TryParse(intDigits.Slice(0, PowersOf1e9.MaxPartialDigits), out base1E9[di]);
                     intDigits = intDigits.Slice(PowersOf1e9.MaxPartialDigits);
                 }
                 Debug.Assert(intDigits.Length == 0);
             }
 
             const double digitRatio = 0.10381025297; // log_{2^32}(10)
-            int resultLength = checked((int)(number.Scale * digitRatio) + 1 + 2);
+            int resultLength = checked((int)(digitRatio * number.Scale) + 1 + 2);
             uint[]? resultBufferFromPool = null;
             Span<uint> resultBuffer = (
                 resultLength <= BigIntegerCalculator.StackAllocThreshold
@@ -375,7 +383,7 @@ namespace Kzrnm.Numerics.Port
             }
             else
             {
-                DivideAndConquer(base1E9, totalDigitCount, trailingZeroCount, resultBuffer);
+                DivideAndConquer(base1E9, trailingZeroCount, resultBuffer);
             }
 
             result = new BigInteger(resultBuffer, number.IsNegative);
@@ -387,14 +395,14 @@ namespace Kzrnm.Numerics.Port
 
             return ParsingStatus.OK;
 
-            static void DivideAndConquer(ReadOnlySpan<uint> base1E9, int totalDigitCount, int trailingZeroCount, scoped Span<uint> bits)
+            static void DivideAndConquer(ReadOnlySpan<uint> base1E9, int trailingZeroCount, scoped Span<uint> bits)
             {
-                int valueDigits = (base1E9.Length - 1) * PowersOf1e9.MaxPartialDigits + CountDigits(base1E9[^1]);
+                int valueDigits = (base1E9.Length - 1) * PowersOf1e9.MaxPartialDigits + FormattingHelpers.CountDigits(base1E9[^1]);
 
                 int powersOf1e9BufferLength = PowersOf1e9.GetBufferSize(Math.Max(valueDigits, trailingZeroCount + 1), out int maxIndex);
                 uint[]? powersOf1e9BufferFromPool = null;
                 Span<uint> powersOf1e9Buffer = (
-                    powersOf1e9BufferLength <= BigIntegerCalculator.StackAllocThreshold
+                    (uint)powersOf1e9BufferLength <= BigIntegerCalculator.StackAllocThreshold
                     ? stackalloc uint[BigIntegerCalculator.StackAllocThreshold]
                     : powersOf1e9BufferFromPool = ArrayPool<uint>.Shared.Rent(powersOf1e9BufferLength)).Slice(0, powersOf1e9BufferLength);
                 powersOf1e9Buffer.Clear();
@@ -403,7 +411,7 @@ namespace Kzrnm.Numerics.Port
 
                 if (trailingZeroCount > 0)
                 {
-                    int leadingLength = checked((int)(digitRatio * totalDigitCount) + 2);
+                    int leadingLength = checked((int)(digitRatio * PowersOf1e9.MaxPartialDigits * base1E9.Length) + 3);
                     uint[]? leadingFromPool = null;
                     Span<uint> leading = (
                         leadingLength <= BigIntegerCalculator.StackAllocThreshold
@@ -462,10 +470,7 @@ namespace Kzrnm.Numerics.Port
 
                 ReadOnlySpan<uint> buffer2 = buffer.Slice(0, BigIntegerCalculator.ActualLength(buffer));
                 Span<uint> bitsUpper = bits.Slice(multiplierTrailingZeroCount, buffer2.Length + multiplier.Length);
-                if (multiplier.Length < buffer2.Length)
-                    BigIntegerCalculator.Multiply(buffer2, multiplier, bitsUpper);
-                else
-                    BigIntegerCalculator.Multiply(multiplier, buffer2, bitsUpper);
+                BigIntegerCalculator.Multiply(buffer2, multiplier, bitsUpper);
 
                 buffer.Clear();
 
@@ -768,22 +773,35 @@ namespace Kzrnm.Numerics.Port
                 }
             }
 
-            // The Ratio is calculated as: log_{10^9}(2^32)
-            const double digitRatio = 1.0703288734719332;
-
-            int base1E9BufferLength = (int)(value._bits.Length * digitRatio) + 1;
+            // The Ratio is calculated as: log_{10^9}(2^32) = 1.0703288734719332
+            // value._bits.Length represents the number of digits when considering value
+            // in base 2^32. This means it satisfies the inequality:
+            // value._bits.Length - 1 <= log_{2^32}(value) < value._bits.Length
+            //
+            // When converting value to a decimal string, it is first converted to
+            // base 1,000,000,000.
+            //
+            // Dividing the equation by log_{2^32}(10^9),which is equivalent to
+            // multiplying by log_{10^9}(2^32), and using the base change formula,
+            // we get:
+            // M - log_{10^9}(2^32) <= log_{10^9}(value) < M <= Ceiling(M)
+            // where M is log_{10^9}(2^32)*value._bits.Length.
+            // In other words, the number of digits of value in base 1,000,000,000 is at most Ceiling(M).
+            const double digitRatio = 1.070328873472;
             Debug.Assert(BigInteger.MaxLength * digitRatio + 1 < Array.MaxLength); // won't overflow
 
+            int base1E9BufferLength = (int)(value._bits.Length * digitRatio) + 1;
             uint[]? base1E9BufferFromPool = null;
-            Span<uint> base1E9Buffer = base1E9BufferLength < BigIntegerCalculator.StackAllocThreshold ?
+            Span<uint> base1E9Buffer = ((uint)base1E9BufferLength <= BigIntegerCalculator.StackAllocThreshold ?
                 stackalloc uint[base1E9BufferLength] :
-                (base1E9BufferFromPool = ArrayPool<uint>.Shared.Rent(base1E9BufferLength));
+                (base1E9BufferFromPool = ArrayPool<uint>.Shared.Rent(base1E9BufferLength))).Slice(0, base1E9BufferLength);
             base1E9Buffer.Clear();
+
 
             BigIntegerToBase1E9(value._bits, base1E9Buffer, out int written);
             ReadOnlySpan<uint> base1E9Value = base1E9Buffer[..written];
 
-            int valueDigits = (base1E9Value.Length - 1) * PowersOf1e9.MaxPartialDigits + CountDigits(base1E9Value[^1]);
+            int valueDigits = (base1E9Value.Length - 1) * PowersOf1e9.MaxPartialDigits + FormattingHelpers.CountDigits(base1E9Value[^1]);
 
             string? strResult;
 
@@ -839,7 +857,7 @@ namespace Kzrnm.Numerics.Port
                 {
                     scoped NumberBuffer number = new NumberBuffer(NumberBufferKind.Integer, ptr, valueDigits + 1);
                     BigIntegerToDecChars((Utf8Char*)ptr + valueDigits, base1E9Value, valueDigits);
-                    number.Digits[^1] = 0;
+                    number.Digits[^1] = '\0';
                     number.DigitsCount = valueDigits;
                     number.Scale = valueDigits;
                     number.IsNegative = value.Sign < 0;
@@ -900,11 +918,11 @@ namespace Kzrnm.Numerics.Port
 
 #if DEBUG
         // Mutable for unit testing...
-        internal static
+        public static
 #else
-        internal const
+        public const
 #endif
-        int ToStringNaiveThreshold = BigIntegerCalculator.DivideBurnikelZieglerThreshold;
+            int ToStringNaiveThreshold = BigIntegerCalculator.DivideBurnikelZieglerThreshold;
         private static void BigIntegerToBase1E9(ReadOnlySpan<uint> bits, Span<uint> base1E9Buffer, out int leadingWritten)
         {
             Debug.Assert(ToStringNaiveThreshold >= 2);
@@ -915,7 +933,7 @@ namespace Kzrnm.Numerics.Port
                 return;
             }
 
-            PowersOf1e9.FloorBufferSize(bits.Length, out int powersOf1e9BufferLength, out int mi);
+            PowersOf1e9.FloorBufferSize(bits.Length, out int powersOf1e9BufferLength, out int maxIndex);
             uint[]? powersOf1e9BufferFromPool = null;
             Span<uint> powersOf1e9Buffer = (
                 powersOf1e9BufferLength <= BigIntegerCalculator.StackAllocThreshold
@@ -925,7 +943,7 @@ namespace Kzrnm.Numerics.Port
 
             PowersOf1e9 powersOf1e9 = new PowersOf1e9(powersOf1e9Buffer);
 
-            DivideAndConquer(powersOf1e9, mi, bits, base1E9Buffer, out leadingWritten);
+            DivideAndConquer(powersOf1e9, maxIndex, bits, base1E9Buffer, out leadingWritten);
 
             if (powersOf1e9BufferFromPool != null)
             {
@@ -935,6 +953,7 @@ namespace Kzrnm.Numerics.Port
             static void DivideAndConquer(in PowersOf1e9 powersOf1e9, int powersIndex, ReadOnlySpan<uint> bits, Span<uint> base1E9Buffer, out int leadingWritten)
             {
                 Debug.Assert(bits.Length == 0 || bits[^1] != 0);
+                Debug.Assert(powersIndex >= 0);
 
                 if (bits.Length <= ToStringNaiveThreshold)
                 {
@@ -942,7 +961,6 @@ namespace Kzrnm.Numerics.Port
                     return;
                 }
 
-                Debug.Assert(powersIndex >= 0);
                 ReadOnlySpan<uint> powOfTen = powersOf1e9.GetSpan(powersIndex);
                 int omittedLength = PowersOf1e9.OmittedLength(powersIndex);
 
@@ -967,19 +985,22 @@ namespace Kzrnm.Numerics.Port
 
                 bits.Slice(0, omittedLength).CopyTo(lower);
                 BigIntegerCalculator.Divide(bits.Slice(omittedLength), powOfTen, upper, lower.Slice(omittedLength));
+
                 Debug.Assert(!upper.Trim(0u).IsEmpty);
 
                 int lower1E9Length = 1 << powersIndex;
+
                 DivideAndConquer(
                     powersOf1e9,
                     powersIndex - 1,
                     lower.Slice(0, BigIntegerCalculator.ActualLength(lower)),
                     base1E9Buffer,
                     out int lowerWritten);
+
                 if (lowerFromPool != null)
                     ArrayPool<uint>.Shared.Return(lowerFromPool);
-                Debug.Assert(lower1E9Length >= lowerWritten);
 
+                Debug.Assert(lower1E9Length >= lowerWritten);
 
                 DivideAndConquer(
                     powersOf1e9,
@@ -987,6 +1008,7 @@ namespace Kzrnm.Numerics.Port
                     upper.Slice(0, BigIntegerCalculator.ActualLength(upper)),
                     base1E9Buffer.Slice(lower1E9Length),
                     out leadingWritten);
+
                 if (upperFromPool != null)
                     ArrayPool<uint>.Shared.Return(upperFromPool);
 
@@ -995,77 +1017,34 @@ namespace Kzrnm.Numerics.Port
 
             static void Naive(ReadOnlySpan<uint> bits, Span<uint> base1E9Buffer, out int leadingWritten)
             {
-                // First convert to base 10^9.
-                int cuSrc = bits.Length;
-                int cuDst = 0;
+                leadingWritten = 0;
 
-                for (int iuSrc = cuSrc; --iuSrc >= 0;)
+                for (int iuSrc = bits.Length; --iuSrc >= 0;)
                 {
                     uint uCarry = bits[iuSrc];
-                    for (int iuDst = 0; iuDst < cuDst; iuDst++)
+                    for (int iuDst = 0; iuDst < leadingWritten; iuDst++)
                     {
                         Debug.Assert(base1E9Buffer[iuDst] < PowersOf1e9.TenPowMaxPartial);
 
-                        // Use X86Base.DivRem when stable
-                        ulong uuRes = NumericsHelpers.MakeUInt64(base1E9Buffer[iuDst], uCarry);
-                        (ulong quo, ulong rem) = Math.DivRem(uuRes, PowersOf1e9.TenPowMaxPartial);
-                        uCarry = (uint)quo;
-                        base1E9Buffer[iuDst] = (uint)rem;
+                        (uCarry, base1E9Buffer[iuDst]) = DivRemTenPowMaxPartial(base1E9Buffer[iuDst], uCarry);
                     }
                     if (uCarry != 0)
                     {
-                        (uCarry, base1E9Buffer[cuDst++]) = Math.DivRem(uCarry, PowersOf1e9.TenPowMaxPartial);
+                        (uCarry, base1E9Buffer[leadingWritten++]) = Math.DivRem(uCarry, PowersOf1e9.TenPowMaxPartial);
                         if (uCarry != 0)
-                            base1E9Buffer[cuDst++] = uCarry;
+                            base1E9Buffer[leadingWritten++] = uCarry;
                     }
                 }
-                leadingWritten = cuDst;
-            }
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static int CountDigits(uint value)
-        {
-            // Algorithm based on https://lemire.me/blog/2021/06/03/computing-the-number-of-digits-of-an-integer-even-faster.
-            ReadOnlySpan<long> table = new long[]
-            {
-                    4294967296,
-                    8589934582,
-                    8589934582,
-                    8589934582,
-                    12884901788,
-                    12884901788,
-                    12884901788,
-                    17179868184,
-                    17179868184,
-                    17179868184,
-                    21474826480,
-                    21474826480,
-                    21474826480,
-                    21474826480,
-                    25769703776,
-                    25769703776,
-                    25769703776,
-                    30063771072,
-                    30063771072,
-                    30063771072,
-                    34349738368,
-                    34349738368,
-                    34349738368,
-                    34349738368,
-                    38554705664,
-                    38554705664,
-                    38554705664,
-                    41949672960,
-                    41949672960,
-                    41949672960,
-                    42949672960,
-                    42949672960,
-            };
-            Debug.Assert(table.Length == 32, "Every result of uint.Log2(value) needs a long entry in the table.");
 
-            // TODO: Replace with table[uint.Log2(value)] once https://github.com/dotnet/runtime/issues/79257 is fixed
-            long tableValue = Unsafe.Add(ref MemoryMarshal.GetReference(table), uint.Log2(value));
-            return (int)((value + tableValue) >> 32);
+                [MethodImpl(MethodImplOptions.AggressiveInlining)]
+                static (uint, uint) DivRemTenPowMaxPartial(uint hi, uint lo)
+                {
+                    // Use X86Base.DivRem when stable
+                    ulong v = NumericsHelpers.MakeUInt64(hi, lo);
+                    (ulong quo, ulong rem) = Math.DivRem(v, PowersOf1e9.TenPowMaxPartial);
+                    return ((uint)quo, (uint)rem);
+                }
+            }
         }
 
         internal readonly ref struct PowersOf1e9
@@ -1088,8 +1067,8 @@ namespace Kzrnm.Numerics.Port
             //        length -= (9*(1<<i)) >> 5;
             //        indexes[i+1] = indexes[i] + length;
             //    }
-            private static ReadOnlySpan<int> Indexes =>
-            [
+            private static ReadOnlySpan<int> Indexes => new[]
+            {
                 0,
                 1,
                 3,
@@ -1122,15 +1101,15 @@ namespace Kzrnm.Numerics.Port
                 484817143,
                 969634274,
                 1939268536,
-            ];
+            };
 
             // The PowersOf1e9 structure holds 1000000000^(1<<<n). However, if the lower element is zero,
             // it is truncated. Therefore, if the lower element becomes zero in the process of calculating
             // 1000000000^(1<<<n), it must be truncated. If 1000000000^(1<<<<n) is calculated in advance
             // for less than 6, there is no need to consider the case where the lower element becomes zero
             // during the calculation process, since 1000000000^(1<<<<n) mod 32 is always zero.
-            private static ReadOnlySpan<uint> LeadingPowers1E9 =>
-            [
+            private static ReadOnlySpan<uint> LeadingPowers1E9 => new uint[]
+            {
                 // 1000000000^(1<<0)
                 1000000000,
                 // 1000000000^(1<<1)
@@ -1181,7 +1160,7 @@ namespace Kzrnm.Numerics.Port
                 2389730781,
                 730678769,
                 440721283,
-            ];
+            };
 
             public PowersOf1e9(Span<uint> pow1E9)
             {
@@ -1209,12 +1188,6 @@ namespace Kzrnm.Numerics.Port
                     src = pow1E9.Slice(from, toExclusive - from);
                     Debug.Assert(toExclusive == pow1E9.Length || pow1E9[toExclusive] == 0);
                 }
-            }
-
-            public static int GetMaxIndex(int digits)
-            {
-                uint scale1E9 = (uint)(digits - 1) / MaxPartialDigits;
-                return BitOperations.Log2(scale1E9);
             }
 
             public static int GetBufferSize(int digits, out int maxIndex)
@@ -1261,9 +1234,13 @@ namespace Kzrnm.Numerics.Port
                 {
                     int i = (hi + maxIndex) >> 1;
                     if (size < Indexes[i + 1] - Indexes[i])
+                    {
                         hi = i;
+                    }
                     else
+                    {
                         maxIndex = i;
+                    }
                 }
                 bufferSize = Indexes[maxIndex + 1] + 1;
             }
@@ -1316,10 +1293,7 @@ namespace Kzrnm.Numerics.Port
                         Span<uint> src = powersOfTen.Slice(0, curLength);
                         Span<uint> dst = powersOfTen2.Slice(0, curLength += power.Length);
 
-                        if (power.Length < src.Length)
-                            BigIntegerCalculator.Multiply(src, power, dst);
-                        else
-                            BigIntegerCalculator.Multiply(power, src, dst);
+                        BigIntegerCalculator.Multiply(src, power, dst);
 
                         Span<uint> tmp = powersOfTen;
                         powersOfTen = powersOfTen2;
@@ -1336,10 +1310,8 @@ namespace Kzrnm.Numerics.Port
 
                 powersOfTen = powersOfTen.Slice(0, curLength);
                 Span<uint> bits2 = bits.Slice(omittedLength, curLength += left.Length);
-                if (left.Length < powersOfTen.Length)
-                    BigIntegerCalculator.Multiply(powersOfTen, left, bits2);
-                else
-                    BigIntegerCalculator.Multiply(left, powersOfTen, bits2);
+
+                BigIntegerCalculator.Multiply(left, powersOfTen, bits2);
 
                 if (powersOfTenFromPool != null)
                     ArrayPool<uint>.Shared.Return(powersOfTenFromPool);
@@ -1409,4 +1381,54 @@ namespace Kzrnm.Numerics.Port
             return true;
         }
     }
+
+    internal readonly struct BigIntegerHexParser<TChar> : IBigIntegerHexOrBinaryParser<BigIntegerHexParser<TChar>, TChar>
+        where TChar : unmanaged, IBinaryInteger<TChar>
+    {
+        public static int BitsPerDigit => 4;
+
+        public static NumberStyles BlockNumberStyle => NumberStyles.AllowHexSpecifier;
+
+        // A valid ASCII hex digit is positive (0-7) if it starts with 00110
+        public static uint GetSignBitsIfValid(uint ch) => (uint)((ch & 0b_1111_1000) == 0b_0011_0000 ? 0 : -1);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool TryParseWholeBlocks(ReadOnlySpan<TChar> input, Span<uint> destination)
+        {
+            if (typeof(TChar) == typeof(char))
+            {
+#if NET9_0_OR_GREATER
+                if (Convert.FromHexString(MemoryMarshal.Cast<TChar, char>(input), MemoryMarshal.AsBytes(destination), out _, out _) != OperationStatus.Done)
+#else
+                if (!HexConverter.TryDecodeFromUtf16(MemoryMarshal.Cast<TChar, char>(input), MemoryMarshal.AsBytes(destination), out _))
+#endif
+                    return false;
+
+                if (BitConverter.IsLittleEndian)
+                {
+                    MemoryMarshal.AsBytes(destination).Reverse();
+                }
+                else
+                {
+                    destination.Reverse();
+                }
+
+                return true;
+            }
+
+            throw new NotSupportedException();
+        }
+    }
+#if NET8_0_OR_GREATER
+    internal readonly struct BigIntegerBinaryParser<TChar> : IBigIntegerHexOrBinaryParser<BigIntegerBinaryParser<TChar>, TChar>
+        where TChar : unmanaged, IBinaryInteger<TChar>
+    {
+        public static int BitsPerDigit => 1;
+
+        public static NumberStyles BlockNumberStyle => NumberStyles.AllowBinarySpecifier;
+
+        // Taking the LSB is enough for distinguishing 0/1
+        public static uint GetSignBitsIfValid(uint ch) => (uint)(((int)ch << 31) >> 31);
+    }
+#endif
 }

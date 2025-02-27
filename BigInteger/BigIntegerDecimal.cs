@@ -478,7 +478,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
         public static BigIntegerDecimal ModPow(BigIntegerDecimal value, BigIntegerDecimal exponent, BigIntegerDecimal modulus)
         {
 #if NET8_0_OR_GREATER
-            ArgumentOutOfRangeException.ThrowIfNegative(exponent.Sign);
+            ThrowHelper.ThrowIfNegative(exponent.Sign);
 #else
             static void ArgumentOutOfRangeExceptionThrowIfNegative(int v)
             {
@@ -546,7 +546,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
         public static BigIntegerDecimal Pow(BigIntegerDecimal value, int exponent)
         {
 #if NET8_0_OR_GREATER
-            ArgumentOutOfRangeException.ThrowIfNegative(exponent);
+            ThrowHelper.ThrowIfNegative(exponent);
 #else
             static void ArgumentOutOfRangeExceptionThrowIfNegative(int v)
             {

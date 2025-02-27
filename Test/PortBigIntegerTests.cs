@@ -1,5 +1,4 @@
-﻿#if NET8_0_OR_GREATER
-using Kzrnm.Numerics.Logic;
+﻿using Kzrnm.Numerics.Logic;
 using System.Globalization;
 using System.Numerics;
 
@@ -202,4 +201,3 @@ namespace Kzrnm.Numerics.Test
         }
     }
 }
-#endif

@@ -20,12 +20,12 @@ namespace Kzrnm.Numerics.Port
         private const int MaxUInt32DecDigits = 10;
         private const string PosNumberFormat = "#";
 
-        private static readonly string[] s_posCurrencyFormats =
+        private static readonly string[] s_posCurrencyFormats = new[]
         {
             "$#", "#$", "$ #", "# $"
         };
 
-        private static readonly string[] s_negCurrencyFormats =
+        private static readonly string[] s_negCurrencyFormats = new[]
         {
             "($#)", "-$#", "$-#", "$#-",
             "(#$)", "-#$", "#-$", "#$-",
@@ -34,12 +34,12 @@ namespace Kzrnm.Numerics.Port
             "$- #"
         };
 
-        private static readonly string[] s_posPercentFormats =
+        private static readonly string[] s_posPercentFormats = new[]
         {
             "# %", "#%", "%#", "% #"
         };
 
-        private static readonly string[] s_negPercentFormats =
+        private static readonly string[] s_negPercentFormats = new[]
         {
             "-# %", "-#%", "-%#",
             "%-#", "%#-",
@@ -48,12 +48,12 @@ namespace Kzrnm.Numerics.Port
             "% -#", "#- %"
         };
 
-        private static readonly string[] s_negNumberFormats =
+        private static readonly string[] s_negNumberFormats = new[]
         {
             "(#)", "-#", "- #", "#-", "# -",
         };
 
-        internal static unsafe char ParseFormatSpecifier(ReadOnlySpan<char> format, out int digits)
+        internal static char ParseFormatSpecifier(ReadOnlySpan<char> format, out int digits)
         {
             char c = default;
             if (format.Length > 0)

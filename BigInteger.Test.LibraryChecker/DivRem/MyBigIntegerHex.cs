@@ -10,8 +10,8 @@ namespace Kzrnm.Numerics.Test.DivRem
             int n = cr.Int();
             while (--n >= 0)
             {
-                var a = ParseHex<BigInteger>(cr.AsciiChars());
-                var b = ParseHex<BigInteger>(cr.AsciiChars());
+                var a = ParseHex<BigInteger>(cr.StringChars());
+                var b = ParseHex<BigInteger>(cr.StringChars());
 
                 var quotient = BigInteger.DivRem(a, b, out var remainder);
                 cw.Write(FormatHex(quotient));

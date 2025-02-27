@@ -2,13 +2,13 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
-using System.Numerics;
 using System.Buffers;
 using System.Diagnostics;
+using System.Numerics;
 
 namespace Kzrnm.Numerics.Logic
 {
-    static partial class BigIntegerCalculator
+    internal static partial class BigIntegerCalculator
     {
         public static uint Gcd(uint left, uint right)
         {

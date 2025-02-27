@@ -13,8 +13,6 @@ using System.Runtime.InteropServices;
 
 namespace Kzrnm.Numerics.Port
 {
-    [Serializable]
-    [TypeForwardedFrom("System.Numerics, Version=4.0.0.0, PublicKeyToken=b77a5c561934e089")]
     [DebuggerDisplay("{DebuggerDisplay,nq}")]
     public readonly struct BigInteger
         : ISpanFormattable,
@@ -28,6 +26,15 @@ namespace Kzrnm.Numerics.Port
         internal const int kcbitUint = 32;
         internal const int kcbitUlong = 64;
         internal const int DecimalScaleFactorMask = 0x00FF0000;
+
+        // Various APIs only allow up to int.MaxValue bits, so we will restrict ourselves
+        // to fit within this given our underlying storage representation and the maximum
+        // array length. This gives us just shy of 256MB as the largest allocation size.
+        //
+        // Such a value allows for almost 646,456,974 digits, which is more than large enough
+        // for typical scenarios. If user code requires more than this, they should likely
+        // roll their own type that utilizes native memory and other specialized techniques.
+        internal static int MaxLength => Array.MaxLength / kcbitUint;
 
         // For values int.MinValue < n <= int.MaxValue, the value is stored in sign
         // and _bits is null. For all other values, sign is +1 or -1 and the bits are in _bits
@@ -374,15 +381,14 @@ namespace Kzrnm.Numerics.Port
                     // The bytes parameter is in little-endian byte order.
                     // We can just copy the bytes directly into the uint array.
 
-                    value.Slice(0, wholeUInt32Count * 4).CopyTo(MemoryMarshal.AsBytes<uint>(val));
+                    value.Slice(0, wholeUInt32Count * 4).CopyTo(MemoryMarshal.AsBytes<uint>(val.AsSpan()));
                 }
 
                 // In both of the above cases on big-endian architecture, we need to perform
                 // an endianness swap on the resulting uints.
-                //if (!BitConverter.IsLittleEndian)
-                //{
-                //    BinaryPrimitives.ReverseEndianness(val.AsSpan(0, wholeUInt32Count), val);
-                //}
+                if (!BitConverter.IsLittleEndian)
+                    foreach (ref var v in val.AsSpan(0, wholeUInt32Count))
+                        v = BinaryPrimitives.ReverseEndianness(v);
 
                 // Copy the last uint specially if it's not aligned
                 if (unalignedBytes != 0)
@@ -486,36 +492,43 @@ namespace Kzrnm.Numerics.Port
         /// <param name="negative">The bool indicating the sign of the value.</param>
         internal BigInteger(ReadOnlySpan<uint> value, bool negative)
         {
+            // Try to conserve space as much as possible by checking for wasted leading span entries
+            // sometimes the span has leading zeros from bit manipulation operations & and ^
+
+            int length = value.LastIndexOfAnyExcept(0u) + 1;
+            value = value[..length];
+
             if (value.Length > MaxLength)
             {
                 ThrowHelper.ThrowOverflowException();
             }
 
-            int len;
-
-            // Try to conserve space as much as possible by checking for wasted leading span entries
-            // sometimes the span has leading zeros from bit manipulation operations & and ^
-            for (len = value.Length; len > 0 && value[len - 1] == 0; len--) ;
-
-            if (len == 0)
+            if (value.Length == 0)
             {
-                this = s_bnZeroInt;
+                this = default;
             }
-            else if (len == 1 && value[0] < kuMaskHighBit)
+            else if (value.Length == 1)
             {
-                // Values like (Int32.MaxValue+1) are stored as "0x80000000" and as such cannot be packed into _sign
-                _sign = negative ? -(int)value[0] : (int)value[0];
-                _bits = null;
-                if (_sign == int.MinValue)
+                if (value[0] < kuMaskHighBit)
+                {
+                    _sign = negative ? -(int)value[0] : (int)value[0];
+                    _bits = null;
+                }
+                else if (negative && value[0] == kuMaskHighBit)
                 {
                     // Although Int32.MinValue fits in _sign, we represent this case differently for negate
                     this = s_bnMinInt;
+                }
+                else
+                {
+                    _sign = negative ? -1 : +1;
+                    _bits = new[] { value[0] };
                 }
             }
             else
             {
                 _sign = negative ? -1 : +1;
-                _bits = value.Slice(0, len).ToArray();
+                _bits = value.ToArray();
             }
             AssertValid();
         }
@@ -526,87 +539,88 @@ namespace Kzrnm.Numerics.Port
         /// <param name="value"></param>
         private BigInteger(Span<uint> value)
         {
+            bool isNegative;
+            int length;
+
+            if ((value.Length > 0) && ((int)value[^1] < 0))
+            {
+                isNegative = true;
+                length = value.LastIndexOfAnyExcept(uint.MaxValue) + 1;
+
+                if ((length == 0) || ((int)value[length - 1] >= 0))
+                {
+                    // We need to preserve the sign bit
+                    length++;
+                }
+                Debug.Assert((int)value[length - 1] < 0);
+            }
+            else
+            {
+                isNegative = false;
+                length = value.LastIndexOfAnyExcept(0u) + 1;
+            }
+            value = value[..length];
+
             if (value.Length > MaxLength)
             {
                 ThrowHelper.ThrowOverflowException();
             }
 
-            int dwordCount = value.Length;
-            bool isNegative = dwordCount > 0 && ((value[dwordCount - 1] & kuMaskHighBit) == kuMaskHighBit);
-
-            // Try to conserve space as much as possible by checking for wasted leading span entries
-            while (dwordCount > 0 && value[dwordCount - 1] == 0) dwordCount--;
-
-            if (dwordCount == 0)
+            if (value.Length == 0)
             {
-                // BigInteger.Zero
+                // 0
                 this = s_bnZeroInt;
-                AssertValid();
-                return;
             }
-            if (dwordCount == 1)
+            else if (value.Length == 1)
             {
-                if (unchecked((int)value[0]) < 0 && !isNegative)
+                if (isNegative)
                 {
-                    _bits = new uint[1];
-                    _bits[0] = value[0];
-                    _sign = +1;
+                    if (value[0] == uint.MaxValue)
+                    {
+                        // -1
+                        this = s_bnMinusOneInt;
+                    }
+                    else if (value[0] == kuMaskHighBit)
+                    {
+                        // int.MinValue
+                        this = s_bnMinInt;
+                    }
+                    else
+                    {
+                        _sign = unchecked((int)value[0]);
+                        _bits = null;
+                    }
                 }
-                // Handle the special cases where the BigInteger likely fits into _sign
-                else if (int.MinValue == unchecked((int)value[0]))
+                else if (unchecked((int)value[0]) < 0)
                 {
-                    this = s_bnMinInt;
+                    _sign = +1;
+                    _bits = new[] { value[0] };
                 }
                 else
                 {
                     _sign = unchecked((int)value[0]);
                     _bits = null;
                 }
-                AssertValid();
-                return;
-            }
-
-            if (!isNegative)
-            {
-                // Handle the simple positive value cases where the input is already in sign magnitude
-                _sign = +1;
-                value = value.Slice(0, dwordCount);
-                _bits = value.ToArray();
-                AssertValid();
-                return;
-            }
-
-            // Finally handle the more complex cases where we must transform the input into sign magnitude
-            NumericsHelpers.DangerousMakeTwosComplement(value); // mutates val
-
-            // Pack _bits to remove any wasted space after the twos complement
-            int len = value.Length;
-            while (len > 0 && value[len - 1] == 0) len--;
-
-            // The number is represented by a single dword
-            if (len == 1 && unchecked((int)(value[0])) > 0)
-            {
-                if (value[0] == 1 /* abs(-1) */)
-                {
-                    this = s_bnMinusOneInt;
-                }
-                else if (value[0] == kuMaskHighBit /* abs(Int32.MinValue) */)
-                {
-                    this = s_bnMinInt;
-                }
-                else
-                {
-                    _sign = (-1) * ((int)value[0]);
-                    _bits = null;
-                }
             }
             else
             {
-                _sign = -1;
-                _bits = value.Slice(0, len).ToArray();
+                if (isNegative)
+                {
+                    NumericsHelpers.DangerousMakeTwosComplement(value);
+
+                    // Retrim any leading zeros carried from the sign
+                    length = value.LastIndexOfAnyExcept(0u) + 1;
+                    value = value[..length];
+
+                    _sign = -1;
+                }
+                else
+                {
+                    _sign = +1;
+                }
+                _bits = value.ToArray();
             }
             AssertValid();
-            return;
         }
 
         public static BigInteger Zero { get { return s_bnZeroInt; } }
@@ -614,8 +628,6 @@ namespace Kzrnm.Numerics.Port
         public static BigInteger One { get { return s_bnOneInt; } }
 
         public static BigInteger MinusOne { get { return s_bnMinusOneInt; } }
-
-        internal static int MaxLength => Array.MaxLength / sizeof(uint);
 
         public bool IsPowerOfTwo
         {
@@ -628,15 +640,10 @@ namespace Kzrnm.Numerics.Port
 
                 if (_sign != 1)
                     return false;
+
                 int iu = _bits.Length - 1;
-                if (!BitOperations.IsPow2(_bits[iu]))
-                    return false;
-                while (--iu >= 0)
-                {
-                    if (_bits[iu] != 0)
-                        return false;
-                }
-                return true;
+
+                return BitOperations.IsPow2(_bits[iu]) && _bits.AsSpan(0, iu).IndexOfAnyExcept(0u) < 0;
             }
         }
 
@@ -2472,57 +2479,80 @@ namespace Kzrnm.Numerics.Port
                 return value;
 
             if (shift == int.MinValue)
-                return ((value >> int.MaxValue) >> 1);
+                return value >> unchecked(int.MinValue - kcbitUint) >> kcbitUint;
 
             if (shift < 0)
                 return value >> -shift;
 
             (int digitShift, int smallShift) = Math.DivRem(shift, kcbitUint);
 
-            uint[]? xdFromPool = null;
-            int xl = value._bits?.Length ?? 1;
-            Span<uint> xd = (xl <= BigIntegerCalculator.StackAllocThreshold
-                          ? stackalloc uint[BigIntegerCalculator.StackAllocThreshold]
-                          : xdFromPool = ArrayPool<uint>.Shared.Rent(xl)).Slice(0, xl);
-            bool negx = value.GetPartsForBitManipulation(xd);
+            if (value._bits is null)
+                return LeftShift(value._sign, digitShift, smallShift);
 
-            int zl = xl + digitShift + 1;
-            uint[]? zdFromPool = null;
-            Span<uint> zd = ((uint)zl <= BigIntegerCalculator.StackAllocThreshold
-                          ? stackalloc uint[BigIntegerCalculator.StackAllocThreshold]
-                          : zdFromPool = ArrayPool<uint>.Shared.Rent(zl)).Slice(0, zl);
-            zd.Clear();
 
-            uint carry = 0;
-            if (smallShift == 0)
+            ReadOnlySpan<uint> bits = value._bits;
+
+            Debug.Assert(bits.Length > 0);
+
+
+            uint over = smallShift == 0
+                ? 0
+                : bits[^1] >> (kcbitUint - smallShift);
+
+            uint[] z;
+            int zLength = bits.Length + digitShift;
+            if (over != 0)
             {
-                for (int i = 0; i < xd.Length; i++)
-                {
-                    zd[i + digitShift] = xd[i];
-                }
+                z = new uint[++zLength];
+                z[^1] = over;
             }
             else
             {
-                int carryShift = kcbitUint - smallShift;
-                int i;
-                for (i = 0; i < xd.Length; i++)
-                {
-                    uint rot = xd[i];
-                    zd[i + digitShift] = rot << smallShift | carry;
-                    carry = rot >> carryShift;
-                }
+                z = new uint[zLength];
             }
 
-            zd[zd.Length - 1] = carry;
+            Span<uint> zd = z.AsSpan(digitShift, bits.Length);
 
-            var result = new BigInteger(zd, negx);
+            bits.CopyTo(zd);
 
-            if (xdFromPool != null)
-                ArrayPool<uint>.Shared.Return(xdFromPool);
-            if (zdFromPool != null)
-                ArrayPool<uint>.Shared.Return(zdFromPool);
+            BigIntegerCalculator.LeftShiftSelf(zd, smallShift, out uint carry);
 
-            return result;
+            Debug.Assert(carry == over);
+            Debug.Assert(z[^1] != 0);
+
+            return new BigInteger(value._sign, z);
+        }
+        private static BigInteger LeftShift(int value, int digitShift, int smallShift)
+        {
+            if (value == 0)
+                return s_bnZeroInt;
+
+            uint m = NumericsHelpers.Abs(value);
+
+            uint r = m << smallShift;
+            uint over =
+                smallShift == 0
+                ? 0
+                : m >> (kcbitUint - smallShift);
+
+            uint[] rgu;
+
+            if (over == 0)
+            {
+                if (digitShift == 0 && r < kuMaskHighBit)
+                    return new BigInteger(value << smallShift, null);
+
+                rgu = new uint[digitShift + 1];
+            }
+            else
+            {
+                rgu = new uint[digitShift + 2];
+                rgu[^1] = over;
+            }
+
+            rgu[digitShift] = r;
+
+            return new BigInteger(Math.Sign(value), rgu);
         }
 
         public static BigInteger operator >>(BigInteger value, int shift)
@@ -2531,89 +2561,53 @@ namespace Kzrnm.Numerics.Port
                 return value;
 
             if (shift == int.MinValue)
-                return ((value << int.MaxValue) << 1);
+                return value << kcbitUint << unchecked(int.MinValue - kcbitUint);
 
             if (shift < 0)
                 return value << -shift;
 
             (int digitShift, int smallShift) = Math.DivRem(shift, kcbitUint);
 
-            BigInteger result;
-
-            uint[]? xdFromPool = null;
-            int xl = value._bits?.Length ?? 1;
-            Span<uint> xd = (xl <= BigIntegerCalculator.StackAllocThreshold
-                          ? stackalloc uint[BigIntegerCalculator.StackAllocThreshold]
-                          : xdFromPool = ArrayPool<uint>.Shared.Rent(xl)).Slice(0, xl);
-
-            bool negx = value.GetPartsForBitManipulation(xd);
-            bool trackSignBit = false;
-
-            if (negx)
+            if (value._bits is null)
             {
-                if (shift >= ((long)kcbitUint * xd.Length))
-                {
-                    result = MinusOne;
-                    goto exit;
-                }
+                if (digitShift != 0)
+                    smallShift = 31;
 
-                NumericsHelpers.DangerousMakeTwosComplement(xd); // Mutates xd
-
-                // For a shift of N x 32 bit,
-                // We check for a special case where its sign bit could be outside the uint array after 2's complement conversion.
-                // For example given [0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF], its 2's complement is [0x01, 0x00, 0x00]
-                // After a 32 bit right shift, it becomes [0x00, 0x00] which is [0x00, 0x00] when converted back.
-                // The expected result is [0x00, 0x00, 0xFFFFFFFF] (2's complement) or [0x00, 0x00, 0x01] when converted back
-                // If the 2's component's last element is a 0, we will track the sign externally
-                trackSignBit = smallShift == 0 && xd[xd.Length - 1] == 0;
+                return new BigInteger(value._sign >> smallShift, null);
             }
 
-            uint[]? zdFromPool = null;
-            int zl = Math.Max(xl - digitShift, 0) + (trackSignBit ? 1 : 0);
-            Span<uint> zd = ((uint)zl <= BigIntegerCalculator.StackAllocThreshold
-                          ? stackalloc uint[BigIntegerCalculator.StackAllocThreshold]
-                          : zdFromPool = ArrayPool<uint>.Shared.Rent(zl)).Slice(0, zl);
-            zd.Clear();
+            ReadOnlySpan<uint> bits = value._bits;
 
-            if (smallShift == 0)
+            Debug.Assert(bits.Length > 0);
+
+            int zLength = bits.Length - digitShift + 1;
+
+            if (zLength <= 1)
+                return new BigInteger(value._sign >> (kcbitUint - 1), null);
+
+            uint[]? zFromPool = null;
+            Span<uint> zd = ((uint)zLength <= BigIntegerCalculator.StackAllocThreshold
+                            ? stackalloc uint[BigIntegerCalculator.StackAllocThreshold]
+                            : zFromPool = ArrayPool<uint>.Shared.Rent(zLength)).Slice(0, zLength);
+
+            zd[^1] = 0;
+            bits.Slice(digitShift).CopyTo(zd);
+
+            BigIntegerCalculator.RightShiftSelf(zd, smallShift, out uint carry);
+
+            bool neg = value._sign < 0;
+            if (neg && (carry != 0 || bits.Slice(0, digitShift).IndexOfAnyExcept(0u) >= 0))
             {
-                for (int i = xd.Length - 1; i >= digitShift; i--)
-                {
-                    zd[i - digitShift] = xd[i];
-                }
-            }
-            else
-            {
-                int carryShift = kcbitUint - smallShift;
-                uint carry = 0;
-                for (int i = xd.Length - 1; i >= digitShift; i--)
-                {
-                    uint rot = xd[i];
-                    if (negx && i == xd.Length - 1)
-                        // Sign-extend the first shift for negative ints then let the carry propagate
-                        zd[i - digitShift] = (rot >> smallShift) | (0xFFFFFFFF << carryShift);
-                    else
-                        zd[i - digitShift] = (rot >> smallShift) | carry;
-                    carry = rot << carryShift;
-                }
+                int leastSignificant = zd.IndexOfAnyExcept(uint.MaxValue);
+                Debug.Assert((uint)leastSignificant < (uint)zd.Length);
+                ++zd[leastSignificant];
+                zd.Slice(0, leastSignificant).Clear();
             }
 
-            if (negx)
-            {
-                // Set the tracked sign to the last element
-                if (trackSignBit)
-                    zd[zd.Length - 1] = 0xFFFFFFFF;
+            BigInteger result = new BigInteger(zd, neg);
 
-                NumericsHelpers.DangerousMakeTwosComplement(zd); // Mutates zd
-            }
-
-            result = new BigInteger(zd, negx);
-
-            if (zdFromPool != null)
-                ArrayPool<uint>.Shared.Return(zdFromPool);
-            exit:
-            if (xdFromPool != null)
-                ArrayPool<uint>.Shared.Return(xdFromPool);
+            if (zFromPool != null)
+                ArrayPool<uint>.Shared.Return(zFromPool);
 
             return result;
         }
@@ -2709,21 +2703,9 @@ namespace Kzrnm.Numerics.Port
                 Span<uint> bits = ((uint)size <= BigIntegerCalculator.StackAllocThreshold
                                 ? stackalloc uint[BigIntegerCalculator.StackAllocThreshold]
                                 : bitsFromPool = ArrayPool<uint>.Shared.Rent(size)).Slice(0, size);
-
-                BigIntegerCalculator.Square(left, bits);
-                result = new BigInteger(bits, (leftSign < 0) ^ (rightSign < 0));
-            }
-            else if (left.Length < right.Length)
-            {
-                Debug.Assert(!left.IsEmpty && !right.IsEmpty);
-
-                int size = left.Length + right.Length;
-                Span<uint> bits = ((uint)size <= BigIntegerCalculator.StackAllocThreshold
-                                ? stackalloc uint[BigIntegerCalculator.StackAllocThreshold]
-                                : bitsFromPool = ArrayPool<uint>.Shared.Rent(size)).Slice(0, size);
                 bits.Clear();
 
-                BigIntegerCalculator.Multiply(right, left, bits);
+                BigIntegerCalculator.Square(left, bits);
                 result = new BigInteger(bits, (leftSign < 0) ^ (rightSign < 0));
             }
             else
@@ -3060,32 +3042,6 @@ namespace Kzrnm.Numerics.Port
             return bitLength - 1;
         }
 
-        /// <summary>
-        /// Encapsulate the logic of normalizing the "small" and "large" forms of BigInteger
-        /// into the "large" form so that Bit Manipulation algorithms can be simplified.
-        /// </summary>
-        /// <param name="xd">
-        /// The UInt32 array containing the entire big integer in "large" (denormalized) form.
-        /// E.g., the number one (1) and negative one (-1) are both stored as 0x00000001
-        /// BigInteger values Int32.MinValue &lt; x &lt;= Int32.MaxValue are converted to this
-        /// format for convenience.
-        /// </param>
-        /// <returns>True for negative numbers.</returns>
-        private bool GetPartsForBitManipulation(Span<uint> xd)
-        {
-            Debug.Assert(_bits is null ? xd.Length == 1 : xd.Length == _bits.Length);
-
-            if (_bits is null)
-            {
-                xd[0] = (uint)(_sign < 0 ? -_sign : _sign);
-            }
-            else
-            {
-                _bits.CopyTo(xd);
-            }
-            return _sign < 0;
-        }
-
         [Conditional("DEBUG")]
         private void AssertValid()
         {
@@ -3190,7 +3146,6 @@ namespace Kzrnm.Numerics.Port
 
                     part = ~value._bits[i];
                     result += uint.PopCount(part);
-
                     i++;
                 }
             }
@@ -3202,267 +3157,89 @@ namespace Kzrnm.Numerics.Port
         public static BigInteger RotateLeft(BigInteger value, int rotateAmount)
         {
             value.AssertValid();
-            int byteCount = (value._bits is null) ? sizeof(int) : (value._bits.Length * 4);
-
-            // Normalize the rotate amount to drop full rotations
-            rotateAmount = (int)(rotateAmount % (byteCount * 8L));
 
             if (rotateAmount == 0)
                 return value;
 
-            if (rotateAmount == int.MinValue)
-                return RotateRight(RotateRight(value, int.MaxValue), 1);
+            bool neg = value._sign < 0;
 
-            if (rotateAmount < 0)
-                return RotateRight(value, -rotateAmount);
-
-            (int digitShift, int smallShift) = Math.DivRem(rotateAmount, kcbitUint);
-
-            uint[]? xdFromPool = null;
-            int xl = value._bits?.Length ?? 1;
-
-            Span<uint> xd = (xl <= BigIntegerCalculator.StackAllocThreshold)
-                          ? stackalloc uint[BigIntegerCalculator.StackAllocThreshold]
-                          : xdFromPool = ArrayPool<uint>.Shared.Rent(xl);
-            xd = xd.Slice(0, xl);
-
-            bool negx = value.GetPartsForBitManipulation(xd);
-
-            int zl = xl;
-            uint[]? zdFromPool = null;
-
-            Span<uint> zd = (zl <= BigIntegerCalculator.StackAllocThreshold)
-                          ? stackalloc uint[BigIntegerCalculator.StackAllocThreshold]
-                          : zdFromPool = ArrayPool<uint>.Shared.Rent(zl);
-            zd = zd.Slice(0, zl);
-
-            zd.Clear();
-
-            if (negx)
+            if (value._bits is null)
             {
-                NumericsHelpers.DangerousMakeTwosComplement(xd);
+                uint rs = BitOperations.RotateLeft((uint)value._sign, rotateAmount);
+                return neg
+                       ? new BigInteger((int)rs)
+                       : new BigInteger(rs);
             }
 
-            if (smallShift == 0)
-            {
-                int dstIndex = 0;
-                int srcIndex = xd.Length - digitShift;
-
-                do
-                {
-                    // Copy last digitShift elements from xd to the start of zd
-                    zd[dstIndex] = xd[srcIndex];
-
-                    dstIndex++;
-                    srcIndex++;
-                }
-                while (srcIndex < xd.Length);
-
-                srcIndex = 0;
-
-                while (dstIndex < zd.Length)
-                {
-                    // Copy remaining elements from start of xd to end of zd
-                    zd[dstIndex] = xd[srcIndex];
-
-                    dstIndex++;
-                    srcIndex++;
-                }
-            }
-            else
-            {
-                int carryShift = kcbitUint - smallShift;
-
-                int dstIndex = 0;
-                int srcIndex = 0;
-
-                uint carry = 0;
-
-                if (digitShift == 0)
-                {
-                    carry = xd[^1] >> carryShift;
-                }
-                else
-                {
-                    srcIndex = xd.Length - digitShift;
-                    carry = xd[srcIndex - 1] >> carryShift;
-                }
-
-                do
-                {
-                    uint part = xd[srcIndex];
-
-                    zd[dstIndex] = (part << smallShift) | carry;
-                    carry = part >> carryShift;
-
-                    dstIndex++;
-                    srcIndex++;
-                }
-                while (srcIndex < xd.Length);
-
-                srcIndex = 0;
-
-                while (dstIndex < zd.Length)
-                {
-                    uint part = xd[srcIndex];
-
-                    zd[dstIndex] = (part << smallShift) | carry;
-                    carry = part >> carryShift;
-
-                    dstIndex++;
-                    srcIndex++;
-                }
-            }
-
-            if (negx && (int)zd[^1] < 0)
-            {
-                NumericsHelpers.DangerousMakeTwosComplement(zd);
-            }
-            else
-            {
-                negx = false;
-            }
-
-            var result = new BigInteger(zd, negx);
-
-            if (xdFromPool != null)
-                ArrayPool<uint>.Shared.Return(xdFromPool);
-            if (zdFromPool != null)
-                ArrayPool<uint>.Shared.Return(zdFromPool);
-
-            return result;
+            return Rotate(value._bits, neg, rotateAmount);
         }
 
         /// <inheritdoc cref="IBinaryInteger{TSelf}.RotateRight(TSelf, int)" />
         public static BigInteger RotateRight(BigInteger value, int rotateAmount)
         {
             value.AssertValid();
-            int byteCount = (value._bits is null) ? sizeof(int) : (value._bits.Length * 4);
-
-            // Normalize the rotate amount to drop full rotations
-            rotateAmount = (int)(rotateAmount % (byteCount * 8L));
 
             if (rotateAmount == 0)
                 return value;
 
-            if (rotateAmount == int.MinValue)
-                return RotateLeft(RotateLeft(value, int.MaxValue), 1);
+            bool neg = value._sign < 0;
 
-            if (rotateAmount < 0)
-                return RotateLeft(value, -rotateAmount);
-
-            (int digitShift, int smallShift) = Math.DivRem(rotateAmount, kcbitUint);
-
-            uint[]? xdFromPool = null;
-            int xl = value._bits?.Length ?? 1;
-
-            Span<uint> xd = (xl <= BigIntegerCalculator.StackAllocThreshold)
-                          ? stackalloc uint[BigIntegerCalculator.StackAllocThreshold]
-                          : xdFromPool = ArrayPool<uint>.Shared.Rent(xl);
-            xd = xd.Slice(0, xl);
-
-            bool negx = value.GetPartsForBitManipulation(xd);
-
-            int zl = xl;
-            uint[]? zdFromPool = null;
-
-            Span<uint> zd = (zl <= BigIntegerCalculator.StackAllocThreshold)
-                          ? stackalloc uint[BigIntegerCalculator.StackAllocThreshold]
-                          : zdFromPool = ArrayPool<uint>.Shared.Rent(zl);
-            zd = zd.Slice(0, zl);
-
-            zd.Clear();
-
-            if (negx)
+            if (value._bits is null)
             {
-                NumericsHelpers.DangerousMakeTwosComplement(xd);
+                uint rs = BitOperations.RotateRight((uint)value._sign, rotateAmount);
+                return neg
+                       ? new BigInteger((int)rs)
+                       : new BigInteger(rs);
             }
 
-            if (smallShift == 0)
+            return Rotate(value._bits, neg, -(long)rotateAmount);
+        }
+
+        private static BigInteger Rotate(ReadOnlySpan<uint> bits, bool negative, long rotateLeftAmount)
+        {
+            Debug.Assert(bits.Length > 0);
+            Debug.Assert(Math.Abs(rotateLeftAmount) <= 0x80000000);
+
+            int zLength = bits.Length;
+            int leadingZeroCount = negative ? bits.IndexOfAnyExcept(0u) : 0;
+
+            if (negative && bits[^1] >= kuMaskHighBit
+                && !(leadingZeroCount == bits.Length - 1 && bits[^1] == kuMaskHighBit))
+                ++zLength;
+
+            uint[]? zFromPool = null;
+            Span<uint> zd = ((uint)zLength <= BigIntegerCalculator.StackAllocThreshold
+                            ? stackalloc uint[BigIntegerCalculator.StackAllocThreshold]
+                            : zFromPool = ArrayPool<uint>.Shared.Rent(zLength)).Slice(0, zLength);
+
+            zd[^1] = 0;
+            bits.CopyTo(zd);
+
+            if (negative)
             {
-                int dstIndex = 0;
-                int srcIndex = digitShift;
+                Debug.Assert((uint)leadingZeroCount < (uint)zd.Length);
 
-                do
-                {
-                    // Copy first digitShift elements from xd to the end of zd
-                    zd[dstIndex] = xd[srcIndex];
-
-                    dstIndex++;
-                    srcIndex++;
-                }
-                while (srcIndex < xd.Length);
-
-                srcIndex = 0;
-
-                while (dstIndex < zd.Length)
-                {
-                    // Copy remaining elements from end of xd to start of zd
-                    zd[dstIndex] = xd[srcIndex];
-
-                    dstIndex++;
-                    srcIndex++;
-                }
-            }
-            else
-            {
-                int carryShift = kcbitUint - smallShift;
-
-                int dstIndex = 0;
-                int srcIndex = digitShift;
-
-                uint carry = 0;
-
-                if (digitShift == 0)
-                {
-                    carry = xd[^1] << carryShift;
-                }
-                else
-                {
-                    carry = xd[srcIndex - 1] << carryShift;
-                }
-
-                do
-                {
-                    uint part = xd[srcIndex];
-
-                    zd[dstIndex] = (part >> smallShift) | carry;
-                    carry = part << carryShift;
-
-                    dstIndex++;
-                    srcIndex++;
-                }
-                while (srcIndex < xd.Length);
-
-                srcIndex = 0;
-
-                while (dstIndex < zd.Length)
-                {
-                    uint part = xd[srcIndex];
-
-                    zd[dstIndex] = (part >> smallShift) | carry;
-                    carry = part << carryShift;
-
-                    dstIndex++;
-                    srcIndex++;
-                }
+                // Same as NumericsHelpers.DangerousMakeTwosComplement(zd);
+                // Leading zero count is already calculated.
+                zd[leadingZeroCount] = (uint)(-(int)zd[leadingZeroCount]);
+                NumericsHelpers.DangerousMakeOnesComplement(zd.Slice(leadingZeroCount + 1));
             }
 
-            if (negx && (int)zd[^1] < 0)
+            BigIntegerCalculator.RotateLeft(zd, rotateLeftAmount);
+
+            if (negative && (int)zd[^1] < 0)
             {
                 NumericsHelpers.DangerousMakeTwosComplement(zd);
             }
             else
             {
-                negx = false;
+                negative = false;
             }
 
-            var result = new BigInteger(zd, negx);
+            var result = new BigInteger(zd, negative);
 
-            if (xdFromPool != null)
-                ArrayPool<uint>.Shared.Return(xdFromPool);
-            if (zdFromPool != null)
-                ArrayPool<uint>.Shared.Return(zdFromPool);
+            if (zFromPool != null)
+                ArrayPool<uint>.Shared.Return(zFromPool);
 
             return result;
         }
@@ -5172,76 +4949,100 @@ namespace Kzrnm.Numerics.Port
                 return value;
 
             if (shiftAmount == int.MinValue)
-                return ((value << int.MaxValue) << 1);
+                return value << kcbitUint << unchecked(int.MinValue - kcbitUint);
 
             if (shiftAmount < 0)
                 return value << -shiftAmount;
 
             (int digitShift, int smallShift) = Math.DivRem(shiftAmount, kcbitUint);
 
+            if (value._bits is null)
+            {
+                return
+                    digitShift != 0
+                    ? new BigInteger(value._sign >> (kcbitUint - 1), null) // If value is a negative number, the operator returns MinusOne.
+                    : new BigInteger(value._sign >>> smallShift, null);
+            }
+
+            ReadOnlySpan<uint> bits = value._bits;
+
+            Debug.Assert(bits.Length > 0);
+
+            int zLength = bits.Length - digitShift;
+
+            if (zLength < 0)
+            {
+                return new BigInteger(value._sign >> (kcbitUint - 1), null); // If value is a negative number, the operator returns MinusOne.;
+            }
+
+            bool neg = value._sign < 0;
+            int negLeadingZeroCount = neg ? bits.IndexOfAnyExcept(0u) : 0;
+
+            if (neg && bits[^1] >= kuMaskHighBit)
+            {
+                ++zLength;
+
+                if (bits[^1] == kuMaskHighBit && negLeadingZeroCount == bits.Length - 1)
+                {
+                    // bits is [0,...,0 ,0x80000000]
+
+                    if (--zLength <= 0)
+                        return s_bnMinusOneInt;
+
+                    if (zLength == 1)
+                        return new BigInteger(int.MinValue >>> smallShift);
+
+                    uint[] rgu = new uint[zLength];
+                    rgu[^1] = kuMaskHighBit >>> smallShift;
+                    return new BigInteger(smallShift == 0 ? -1 : +1, rgu);
+                }
+            }
+
+            uint[]? zFromPool = null;
+            Span<uint> zd = ((uint)zLength <= BigIntegerCalculator.StackAllocThreshold
+                            ? stackalloc uint[BigIntegerCalculator.StackAllocThreshold]
+                            : zFromPool = ArrayPool<uint>.Shared.Rent(zLength)).Slice(0, zLength);
+
+            bits.Slice(digitShift).CopyTo(zd);
+
+            if (neg)
+            {
+                if (bits[^1] >= kuMaskHighBit)
+                    zd[^1] = 0;
+
+                negLeadingZeroCount -= digitShift;
+
+                if ((uint)negLeadingZeroCount < (uint)zd.Length)
+                {
+                    zd[negLeadingZeroCount] = (uint)(-(int)zd[negLeadingZeroCount]);
+                    NumericsHelpers.DangerousMakeOnesComplement(zd.Slice(negLeadingZeroCount + 1));
+                }
+                else
+                {
+                    NumericsHelpers.DangerousMakeOnesComplement(zd);
+                }
+            }
+
+            BigIntegerCalculator.RightShiftSelf(zd, smallShift, out _);
+            zd = zd.TrimEnd(0u);
+
             BigInteger result;
-
-            uint[]? xdFromPool = null;
-            int xl = value._bits?.Length ?? 1;
-            Span<uint> xd = (xl <= BigIntegerCalculator.StackAllocThreshold
-                          ? stackalloc uint[BigIntegerCalculator.StackAllocThreshold]
-                          : xdFromPool = ArrayPool<uint>.Shared.Rent(xl)).Slice(0, xl);
-
-            bool negx = value.GetPartsForBitManipulation(xd);
-
-            if (negx)
+            if (zd.IsEmpty)
             {
-                if (shiftAmount >= ((long)kcbitUint * xd.Length))
-                {
-                    result = MinusOne;
-                    goto exit;
-                }
-
-                NumericsHelpers.DangerousMakeTwosComplement(xd); // Mutates xd
+                result = neg ? s_bnMinusOneInt : default;
             }
-
-            uint[]? zdFromPool = null;
-            int zl = Math.Max(xl - digitShift, 0);
-            Span<uint> zd = ((uint)zl <= BigIntegerCalculator.StackAllocThreshold
-                          ? stackalloc uint[BigIntegerCalculator.StackAllocThreshold]
-                          : zdFromPool = ArrayPool<uint>.Shared.Rent(zl)).Slice(0, zl);
-            zd.Clear();
-
-            if (smallShift == 0)
-            {
-                for (int i = xd.Length - 1; i >= digitShift; i--)
-                {
-                    zd[i - digitShift] = xd[i];
-                }
-            }
-            else
-            {
-                int carryShift = kcbitUint - smallShift;
-                uint carry = 0;
-                for (int i = xd.Length - 1; i >= digitShift; i--)
-                {
-                    uint rot = xd[i];
-                    zd[i - digitShift] = (rot >>> smallShift) | carry;
-                    carry = rot << carryShift;
-                }
-            }
-
-            if (negx && (int)zd[^1] < 0)
+            else if (neg && (int)zd[^1] < 0)
             {
                 NumericsHelpers.DangerousMakeTwosComplement(zd);
+                result = new BigInteger(zd, true);
             }
             else
             {
-                negx = false;
+                result = new BigInteger(zd, false);
             }
 
-            result = new BigInteger(zd, negx);
-
-            if (zdFromPool != null)
-                ArrayPool<uint>.Shared.Return(zdFromPool);
-            exit:
-            if (xdFromPool != null)
-                ArrayPool<uint>.Shared.Return(xdFromPool);
+            if (zFromPool != null)
+                ArrayPool<uint>.Shared.Return(zFromPool);
 
             return result;
         }

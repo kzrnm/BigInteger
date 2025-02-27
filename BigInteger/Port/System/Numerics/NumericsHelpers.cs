@@ -109,23 +109,37 @@ namespace Kzrnm.Numerics.Port
             // where A = ~X and B = -Y
 
             // Trim trailing 0s (at the first in little endian array)
-            d = d.TrimStart(0u);
+            int i = d.IndexOfAnyExcept(0u);
+
+            if ((uint)i >= (uint)d.Length)
+            {
+                return;
+            }
 
             // Make the first non-zero element to be two's complement
-            if (d.Length > 0)
-            {
-                d[0] = (uint)(-(int)d[0]);
-                d = d.Slice(1);
-            }
+            d[i] = (uint)(-(int)d[i]);
+            d = d.Slice(i + 1);
 
             if (d.IsEmpty)
             {
                 return;
             }
 
-            // Make one's complement for other elements
-            int offset = 0;
+            DangerousMakeOnesComplement(d);
+        }
 
+        // Do an in-place one's complement. "Dangerous" because it causes
+        // a mutation and needs to be used with care for immutable types.
+        public static void DangerousMakeOnesComplement(Span<uint> d)
+        {
+            // Given a number:
+            //     XXXXXXXXXXX
+            // where Y is non-zero,
+            // The result of one's complement is
+            //     AAAAAAAAAAA
+            // where A = ~X
+
+            int offset = 0;
             ref uint start = ref MemoryMarshal.GetReference(d);
 
 #if NET8_0_OR_GREATER

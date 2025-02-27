@@ -8,7 +8,7 @@ using System.Runtime.InteropServices;
 
 namespace Kzrnm.Numerics.Logic
 {
-    static partial class BigIntegerCalculator
+    internal static partial class BigIntegerCalculator
     {
         private const int CopyToThreshold = 8;
 
@@ -130,10 +130,12 @@ namespace Kzrnm.Numerics.Logic
             Subtract(left, bits, ref resultPtr, startIndex: i, initialCarry: carry);
         }
 
-        private static void SubtractSelf(Span<uint> left, ReadOnlySpan<uint> right)
+        public static void SubtractSelf(Span<uint> left, ReadOnlySpan<uint> right)
         {
             Debug.Assert(left.Length >= right.Length);
-            Debug.Assert(CompareActual(left, right) >= 0);
+
+            // Assertion failing per https://github.com/dotnet/runtime/issues/97780
+            // Debug.Assert(CompareActual(left, right) >= 0);
 
             int i = 0;
             long carry = 0L;
@@ -159,10 +161,11 @@ namespace Kzrnm.Numerics.Logic
                 carry = digit >> 32;
             }
 
-            Debug.Assert(carry == 0);
+            // Assertion failing per https://github.com/dotnet/runtime/issues/97780
+            //Debug.Assert(carry == 0);
         }
 
-        [MethodImpl(256)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void Add(ReadOnlySpan<uint> left, Span<uint> bits, ref uint resultPtr, int startIndex, long initialCarry)
         {
             // Executes the addition for one big and one 32-bit integer.
@@ -209,7 +212,7 @@ namespace Kzrnm.Numerics.Logic
             }
         }
 
-        [MethodImpl(256)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void Subtract(ReadOnlySpan<uint> left, Span<uint> bits, ref uint resultPtr, int startIndex, long initialCarry)
         {
             // Executes the addition for one big and one 32-bit integer.

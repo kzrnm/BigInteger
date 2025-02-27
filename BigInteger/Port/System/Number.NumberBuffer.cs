@@ -30,11 +30,10 @@ namespace Kzrnm.Numerics.Port
             public bool IsNegative;
             public bool HasNonZeroTail;
             public NumberBufferKind Kind;
-            public byte* DigitsPtr;
-            public int DigitsLength;
-            public readonly Span<byte> Digits => new Span<byte>(DigitsPtr, DigitsLength);
+            public Span<char> Digits;
+            public readonly byte* DigitsPtr => (byte*)Unsafe.AsPointer(ref MemoryMarshal.GetReference(Digits)); // safe since constructor expects Digits to refer to unmovable memory
 
-            public NumberBuffer(NumberBufferKind kind, byte* digits, int digitsLength) : this(kind, new Span<byte>(digits, digitsLength))
+            public NumberBuffer(NumberBufferKind kind, byte* digits, int digitsLength) : this(kind, new Span<char>(digits, digitsLength))
             {
                 Debug.Assert(digits != null);
             }
@@ -42,7 +41,7 @@ namespace Kzrnm.Numerics.Port
             /// <summary>Initializes the NumberBuffer.</summary>
             /// <param name="kind">The kind of the buffer.</param>
             /// <param name="digits">The digits scratch space. The referenced memory must not be moveable, e.g. stack memory, pinned array, etc.</param>
-            public NumberBuffer(NumberBufferKind kind, Span<byte> digits)
+            public NumberBuffer(NumberBufferKind kind, Span<char> digits)
             {
                 Debug.Assert(!digits.IsEmpty);
 
@@ -51,12 +50,11 @@ namespace Kzrnm.Numerics.Port
                 IsNegative = false;
                 HasNonZeroTail = false;
                 Kind = kind;
-                DigitsPtr = (byte*)Unsafe.AsPointer(ref MemoryMarshal.GetReference(digits)); // Safe since memory must be fixed
-                DigitsLength = digits.Length;
+                Digits = digits;
 #if DEBUG
-                Digits.Fill(0xCC);
+                Digits.Fill((char)0xCC);
 #endif
-                Digits[0] = (byte)'\0';
+                Digits[0] = '\0';
                 CheckConsistency();
             }
 
@@ -71,14 +69,14 @@ namespace Kzrnm.Numerics.Port
                 int numDigits;
                 for (numDigits = 0; numDigits < Digits.Length; numDigits++)
                 {
-                    byte digit = Digits[numDigits];
+                    char digit = Digits[numDigits];
 
                     if (digit == 0)
                     {
                         break;
                     }
 
-                    Debug.Assert(char.IsAsciiDigit((char)digit), $"Unexpected character found in Number: {digit}");
+                    Debug.Assert(char.IsAsciiDigit(digit), $"Unexpected character found in Number: {digit}");
                 }
 
                 Debug.Assert(numDigits == DigitsCount, "Null terminator found in unexpected location in Number");
@@ -99,14 +97,14 @@ namespace Kzrnm.Numerics.Port
 
                 for (int i = 0; i < Digits.Length; i++)
                 {
-                    byte digit = Digits[i];
+                    char digit = Digits[i];
 
                     if (digit == 0)
                     {
                         break;
                     }
 
-                    sb.Append((char)(digit));
+                    sb.Append(digit);
                 }
 
                 sb.Append('"');
