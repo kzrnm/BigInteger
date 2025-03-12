@@ -109,30 +109,43 @@ namespace Kzrnm.Numerics.Logic
             // where A = ~X and B = -Y
 
             // Trim trailing 0s (at the first in little endian array)
-            d = d.TrimStart(0u);
+            int i = d.IndexOfAnyExcept(0u);
+
+            if ((uint)i >= (uint)d.Length)
+            {
+                return;
+            }
 
             // Make the first non-zero element to be two's complement
-            if (d.Length > 0)
-            {
-                d[0] = (uint)(-(int)d[0]);
-                d = d.Slice(1);
-            }
+            d[i] = (uint)(-(int)d[i]);
+            d = d.Slice(i + 1);
 
             if (d.IsEmpty)
             {
                 return;
             }
 
-            // Make one's complement for other elements
-            int offset = 0;
+            DangerousMakeOnesComplement(d);
+        }
 
+        // Do an in-place one's complement. "Dangerous" because it causes
+        // a mutation and needs to be used with care for immutable types.
+        public static void DangerousMakeOnesComplement(Span<uint> d)
+        {
+            // Given a number:
+            //     XXXXXXXXXXX
+            // where Y is non-zero,
+            // The result of one's complement is
+            //     AAAAAAAAAAA
+            // where A = ~X
+
+            int offset = 0;
             ref uint start = ref MemoryMarshal.GetReference(d);
 
 #if NET8_0_OR_GREATER
             while (Vector512.IsHardwareAccelerated && d.Length - offset >= Vector512<uint>.Count)
             {
-                Vector512<uint> vector = Vector512.LoadUnsafe(ref start, (nuint)offset);
-                Vector512<uint> complement = Vector512.OnesComplement(vector);
+                Vector512<uint> complement = ~Vector512.LoadUnsafe(ref start, (nuint)offset);
                 Vector512.StoreUnsafe(complement, ref start, (nuint)offset);
                 offset += Vector512<uint>.Count;
             }
@@ -140,16 +153,14 @@ namespace Kzrnm.Numerics.Logic
 
             while (Vector256.IsHardwareAccelerated && d.Length - offset >= Vector256<uint>.Count)
             {
-                Vector256<uint> vector = Vector256.LoadUnsafe(ref start, (nuint)offset);
-                Vector256<uint> complement = Vector256.OnesComplement(vector);
+                Vector256<uint> complement = ~Vector256.LoadUnsafe(ref start, (nuint)offset);
                 Vector256.StoreUnsafe(complement, ref start, (nuint)offset);
                 offset += Vector256<uint>.Count;
             }
 
             while (Vector128.IsHardwareAccelerated && d.Length - offset >= Vector128<uint>.Count)
             {
-                Vector128<uint> vector = Vector128.LoadUnsafe(ref start, (nuint)offset);
-                Vector128<uint> complement = Vector128.OnesComplement(vector);
+                Vector128<uint> complement = ~Vector128.LoadUnsafe(ref start, (nuint)offset);
                 Vector128.StoreUnsafe(complement, ref start, (nuint)offset);
                 offset += Vector128<uint>.Count;
             }

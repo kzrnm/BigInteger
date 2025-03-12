@@ -458,7 +458,7 @@ namespace Kzrnm.Numerics.Logic
 
                 BurnikelZieglerD2n1n(z, b, q, r);
 
-                Debug.Assert(q.Slice(quotientUpper.Length).IndexOfAnyExcept(0u) < 0);
+                Debug.Assert(!q.Slice(quotientUpper.Length).ContainsAnyExcept(0u));
                 q.Slice(0, quotientUpper.Length).CopyTo(quotientUpper);
 
                 if (qFromPool != null)
@@ -485,7 +485,7 @@ namespace Kzrnm.Numerics.Logic
                 ArrayPool<uint>.Shared.Return(aFromPool);
 
             Debug.Assert(r[^1] == 0);
-            Debug.Assert(r.Slice(0, sigmaDigit).IndexOfAnyExcept(0u) < 0);
+            Debug.Assert(!r.Slice(0, sigmaDigit).ContainsAnyExcept(0u));
             if (remainder.Length != 0)
             {
                 Span<uint> rt = r.Slice(sigmaDigit);
@@ -582,7 +582,7 @@ namespace Kzrnm.Numerics.Logic
                 }
                 else
                 {
-                    Debug.Assert(r1.Slice(remainder.Length).IndexOfAnyExcept(0u) < 0);
+                    Debug.Assert(!r1.Slice(remainder.Length).ContainsAnyExcept(0u));
                     r1.Slice(0, remainder.Length).CopyTo(remainder);
                 }
 
@@ -690,10 +690,7 @@ namespace Kzrnm.Numerics.Logic
                 right = right.Slice(0, ActualLength(right));
                 bits = bits.Slice(0, left.Length + right.Length);
 
-                if (left.Length < right.Length)
-                    Multiply(right, left, bits);
-                else
-                    Multiply(left, right, bits);
+                Multiply(left, right, bits);
             }
         }
     }

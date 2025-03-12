@@ -1,10 +1,35 @@
-﻿using System.Diagnostics.CodeAnalysis;
+using System.Diagnostics.CodeAnalysis;
 using System;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+#if !NET8_0_OR_GREATER
+using System.Text;
+#endif
+#if !NET7_0_OR_GREATER
+using System.Collections.Generic;
+#endif
 
 namespace Kzrnm.Numerics
 {
+#if !NET8_0_OR_GREATER
+    internal static class SpanHelper
+    {
+        public static bool ContainsAnyExcept<T>(this Span<T> s, T v) where T : IEquatable<T>? => s.IndexOfAnyExcept(v) >= 0;
+        public static bool ContainsAnyExcept<T>(this ReadOnlySpan<T> s, T v) where T : IEquatable<T>? => s.IndexOfAnyExcept(v) >= 0;
+#if !NET7_0_OR_GREATER
+        public static int IndexOfAnyExcept<T>(this Span<T> s, T v) where T : IEquatable<T>? => IndexOfAnyExcept((ReadOnlySpan<T>)s, v);
+        public static int IndexOfAnyExcept<T>(this ReadOnlySpan<T> s, T v) where T : IEquatable<T>?
+        {
+            for (int i = 0; i < s.Length; i++)
+            {
+                if (!EqualityComparer<T>.Default.Equals(s[i], v))
+                    return i;
+            }
+            return -1;
+        }
+#endif
+    }
+#endif
     internal enum ParsingStatus
     {
         OK,
@@ -50,6 +75,23 @@ namespace Kzrnm.Numerics
     }
     internal static class SR
     {
+#if !NET8_0_OR_GREATER
+        public static bool UIntTryParse(ReadOnlySpan<byte> s, out uint v)
+        {
+            v = 0;
+            if (s.Length > 32)
+                return false;
+
+            Span<char> c = stackalloc char[32];
+            c = c.Slice(0, s.Length);
+            for (int i = c.Length - 1; i >= 0; i--)
+            {
+                c[i] = (char)s[i];
+            }
+
+            return uint.TryParse(c, out v);
+        }
+#endif
         public static string Argument_BadFormatSpecifier => nameof(Argument_BadFormatSpecifier);
         public static string Overflow_UInt64 => nameof(Overflow_UInt64);
         public static string Overflow_UInt32 => nameof(Overflow_UInt32);

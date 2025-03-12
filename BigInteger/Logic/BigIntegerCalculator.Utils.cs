@@ -18,8 +18,8 @@ namespace Kzrnm.Numerics.Logic
 
         public static int Compare(ReadOnlySpan<uint> left, ReadOnlySpan<uint> right)
         {
-            Debug.Assert(left.Length <= right.Length || left.Slice(right.Length).IndexOfAnyExcept(0u) >= 0);
-            Debug.Assert(left.Length >= right.Length || right.Slice(left.Length).IndexOfAnyExcept(0u) >= 0);
+            Debug.Assert(left.Length <= right.Length || left.Slice(right.Length).ContainsAnyExcept(0u));
+            Debug.Assert(left.Length >= right.Length || right.Slice(left.Length).ContainsAnyExcept(0u));
 
             if (left.Length != right.Length)
                 return left.Length < right.Length ? -1 : 1;
