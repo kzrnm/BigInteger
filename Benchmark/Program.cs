@@ -1,4 +1,4 @@
-﻿using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Jobs;
 using BenchmarkDotNet.Reports;
@@ -33,6 +33,8 @@ public class BenchmarkConfig : ManualConfig
         AddJob(Job.ShortRun.WithToolchain(CsProjCoreToolchain.NetCoreApp70));
         AddJob(Job.ShortRun.WithToolchain(CsProjCoreToolchain.NetCoreApp90));
 
+        HideColumns("Error", "StdDev", "Median", "RatioSD");
+
         SummaryStyle = SummaryStyle.Default
         .WithRatioStyle(BenchmarkDotNet.Columns.RatioStyle.Value)
         //.WithTimeUnit(Perfolizer.Horology.TimeUnit.Millisecond)
@@ -47,7 +49,7 @@ public class BigIntegerParse
 {
     Random rnd = new Random(227);
 
-    [Params(10, 1000, 100000)]
+    [Params(1000, 100000, 100000)]
     public int N;
 
     string s;
@@ -76,7 +78,7 @@ public class BigIntegerToString
 {
     Random rnd = new Random(227);
 
-    [Params(10, 1000, 100000)]
+    [Params(1000, 100000, 100000)]
     public int N;
 
     MyBigInteger my;
@@ -107,7 +109,7 @@ public class BigIntegerAdd
 {
     Random rnd = new Random(227);
 
-    [Params(10, 1000, 100000)]
+    [Params(1000, 100000, 100000)]
     public int N;
 
     MyBigInteger my1, my2;
@@ -141,7 +143,7 @@ public class BigIntegerMultiply
 {
     Random rnd = new Random(227);
 
-    [Params(10, 1000, 100000)]
+    [Params(1000, 100000, 100000)]
     public int N;
 
     MyBigInteger my1, my2;
@@ -175,7 +177,7 @@ public class BigIntegerDivide
 {
     Random rnd = new Random(227);
 
-    [Params(10, 1000, 100000)]
+    [Params(1000, 100000, 100000)]
     public int N;
 
     MyBigInteger my1, my2;
