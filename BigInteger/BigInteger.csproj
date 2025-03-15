@@ -10,7 +10,7 @@
 		<DotnetVersion>$([System.Version]::Parse($([MSBuild]::GetTargetFrameworkVersion('$(TargetFramework)'))).Major)</DotnetVersion>
 		<LangVersion Condition="'$(DotnetVersion)' != ''">$([MSBuild]::Add($(DotnetVersion), 4))</LangVersion>
 
-		<VersionPrefix>0.4.0</VersionPrefix>
+		<VersionPrefix>0.4.1</VersionPrefix>
 		<VersionSuffix></VersionSuffix>
 		<VersionSuffix Condition="'$(Embedding)' == 'true'">embedded</VersionSuffix>
 
