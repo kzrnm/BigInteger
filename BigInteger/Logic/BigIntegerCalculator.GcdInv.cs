@@ -8,7 +8,7 @@ using System.Numerics;
 
 namespace Kzrnm.Numerics.Logic
 {
-    internal static partial class BigIntegerCalculator
+    static partial class BigIntegerCalculator
     {
         public static uint Gcd(uint left, uint right)
         {

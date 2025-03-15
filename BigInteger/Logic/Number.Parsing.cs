@@ -5,11 +5,10 @@ using System;
 using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 
 namespace Kzrnm.Numerics.Logic
 {
-    internal static partial class Number
+    static partial class Number
     {
         private static bool TryParseNumber<T>(ref ReadOnlySpan<T> str, NumberStyles styles, ref NumberBuffer number, NumberFormatInfo info)
             where T : unmanaged, IUtfChar<T>

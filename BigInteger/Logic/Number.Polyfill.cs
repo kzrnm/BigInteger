@@ -12,8 +12,12 @@ namespace Kzrnm.Numerics.Logic
 {
     // Polyfill CoreLib internal interfaces and methods
     // Define necessary members only
-
-    internal interface IUtfChar<TSelf> :
+#if Embedding
+    public
+#else
+    internal
+#endif
+    interface IUtfChar<TSelf> :
         IEquatable<TSelf>
         where TSelf : unmanaged, IUtfChar<TSelf>
     {
@@ -74,7 +78,7 @@ namespace Kzrnm.Numerics.Logic
         public bool Equals(Utf8Char other) => value == other.value;
     }
 
-    internal static partial class Number
+    static partial class Number
     {
         internal static bool AllowHyphenDuringParsing(this NumberFormatInfo info)
         {

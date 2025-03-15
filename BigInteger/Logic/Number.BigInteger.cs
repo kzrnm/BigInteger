@@ -1,8 +1,8 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+using System;
 using System.Buffers;
-using System.Buffers.Text;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
@@ -10,12 +10,15 @@ using System.Globalization;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using System;
-using Kzrnm.Numerics;
 
 namespace Kzrnm.Numerics.Logic
 {
-    internal static partial class Number
+#if Embedding
+    public
+#else
+    internal
+#endif
+    static partial class Number
     {
         private const NumberStyles InvalidNumberStyles = ~(NumberStyles.AllowLeadingWhite | NumberStyles.AllowTrailingWhite
                                                            | NumberStyles.AllowLeadingSign | NumberStyles.AllowTrailingSign

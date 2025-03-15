@@ -7,7 +7,7 @@ using System.Text;
 
 namespace Kzrnm.Numerics.Logic
 {
-    internal static partial class Number
+    static partial class Number
     {
         // We need 1 additional byte, per length, for the terminating null
         internal const int DecimalNumberBufferLength = 29 + 1 + 1;  // 29 for the longest input + 1 for rounding

@@ -11,7 +11,7 @@ using System.Text;
 
 namespace Kzrnm.Numerics.Logic
 {
-    internal static partial class Number
+    static partial class Number
     {
         private const int CharStackBufferSize = 32;
 

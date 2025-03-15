@@ -9,7 +9,7 @@ using System.Runtime.Intrinsics;
 
 namespace Kzrnm.Numerics.Logic
 {
-    internal static partial class BigIntegerCalculator
+    static partial class BigIntegerCalculator
     {
         public static void RotateLeft(Span<uint> bits, long rotateLeftAmount)
         {
