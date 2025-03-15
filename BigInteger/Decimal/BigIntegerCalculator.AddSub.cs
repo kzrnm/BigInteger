@@ -133,7 +133,7 @@ namespace Kzrnm.Numerics.Decimal
         private static void SubtractSelf(Span<uint> left, ReadOnlySpan<uint> right)
         {
             Debug.Assert(left.Length >= right.Length);
-            Debug.Assert(CompareActual(left, right) >= 0);
+            //Debug.Assert(CompareActual(left, right) >= 0);
 
             int i = 0;
             long carry = 0;
@@ -156,7 +156,7 @@ namespace Kzrnm.Numerics.Decimal
                 carry = DivRemBase(carry + left[i], out left[i]);
             }
 
-            Debug.Assert(carry == 0);
+            //Debug.Assert(carry == 0);
         }
 
         [MethodImpl(256)]

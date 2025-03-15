@@ -14,7 +14,7 @@ namespace Kzrnm.Numerics.Decimal
 #endif
     static partial class BigIntegerCalculator
     {
-        internal const int Base = 1_000_000_000;
+        internal const uint Base = 1_000_000_000;
         internal const int BaseLog = 9;
 #if NET8_0_OR_GREATER
         static ReadOnlySpan<uint> UInt32PowersOfTen =>
@@ -116,7 +116,7 @@ namespace Kzrnm.Numerics.Decimal
         }
 
         [Conditional("DEBUG")]
-        public static void DummyForDebug(Span<uint> bits)
+        public static void InitializeForDebug(Span<uint> bits)
         {
             // Reproduce the case where the return value of `stackalloc uint` is not initialized to zero.
             bits.Fill(0xCD);

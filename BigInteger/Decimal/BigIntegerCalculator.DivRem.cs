@@ -20,24 +20,24 @@ namespace Kzrnm.Numerics.Decimal
 
         public static void Divide(ReadOnlySpan<uint> left, uint right, Span<uint> quotient, out uint remainder)
         {
-            DummyForDebug(quotient);
+            InitializeForDebug(quotient);
             var carry = 0ul;
-            DivideImpl(left, right, quotient, ref carry);
+            Divide(left, right, quotient, ref carry);
             remainder = (uint)carry;
         }
 
         public static void Divide(ReadOnlySpan<uint> left, uint right, Span<uint> quotient)
         {
-            DummyForDebug(quotient);
+            InitializeForDebug(quotient);
             var carry = 0ul;
-            DivideImpl(left, right, quotient, ref carry);
+            Divide(left, right, quotient, ref carry);
         }
 
-        static void DivideImpl(ReadOnlySpan<uint> left, uint right, Span<uint> quotient, ref ulong carry)
+        static void Divide(ReadOnlySpan<uint> left, uint right, Span<uint> quotient, ref ulong carry)
         {
             Debug.Assert(left.Length >= 1);
             Debug.Assert(quotient.Length == left.Length);
-            DummyForDebug(quotient);
+            InitializeForDebug(quotient);
 
             // Executes the division for one big and one 32-bit integer.
             // Thus, we've similar code than below, but there is no loop for
@@ -73,8 +73,8 @@ namespace Kzrnm.Numerics.Decimal
             Debug.Assert(left.Length >= right.Length);
             Debug.Assert(quotient.Length == left.Length - right.Length + 1);
             Debug.Assert(remainder.Length == left.Length);
-            DummyForDebug(quotient);
-            DummyForDebug(remainder);
+            InitializeForDebug(quotient);
+            InitializeForDebug(remainder);
 
             if (right.Length < DivideBurnikelZieglerThreshold || left.Length - right.Length < DivideBurnikelZieglerThreshold)
                 DivideGrammarSchool(left, right, quotient, remainder);
@@ -88,7 +88,7 @@ namespace Kzrnm.Numerics.Decimal
             Debug.Assert(right.Length >= 1);
             Debug.Assert(left.Length >= right.Length);
             Debug.Assert(quotient.Length == left.Length - right.Length + 1);
-            DummyForDebug(quotient);
+            InitializeForDebug(quotient);
 
             if (right.Length < DivideBurnikelZieglerThreshold || left.Length - right.Length < DivideBurnikelZieglerThreshold)
             {
@@ -112,7 +112,7 @@ namespace Kzrnm.Numerics.Decimal
             Debug.Assert(right.Length >= 1);
             Debug.Assert(left.Length >= right.Length);
             Debug.Assert(remainder.Length == left.Length);
-            DummyForDebug(remainder);
+            InitializeForDebug(remainder);
 
 
             int quotientLength = left.Length - right.Length + 1;
@@ -142,7 +142,7 @@ namespace Kzrnm.Numerics.Decimal
             Debug.Assert(left.Length >= right.Length);
             Debug.Assert(quotient.Length == left.Length - right.Length + 1
                 || quotient.Length == 0);
-            DummyForDebug(quotient);
+            InitializeForDebug(quotient);
 
             uint[]? leftCopyFromPool = null;
             Span<uint> leftCopy = (left.Length <= StackAllocThreshold ?
@@ -579,13 +579,13 @@ namespace Kzrnm.Numerics.Decimal
                     Debug.Assert(left[^1] < right[0]);
 
                     carry = left[^1];
-                    DivideImpl(left.Slice(0, quotient.Length), right[0], quotient, ref carry);
+                    Divide(left.Slice(0, quotient.Length), right[0], quotient, ref carry);
                 }
                 else
                 {
                     carry = 0;
                     quotient.Slice(left.Length).Clear();
-                    DivideImpl(left, right[0], quotient, ref carry);
+                    Divide(left, right[0], quotient, ref carry);
                 }
 
                 if (remainder.Length != 0)
