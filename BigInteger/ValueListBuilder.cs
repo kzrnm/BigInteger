@@ -62,6 +62,22 @@ namespace System.Collections.Generic
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Append(T c, int count)
+        {
+            if (_pos > _span.Length - count)
+            {
+                Grow(count);
+            }
+
+            var dst = _span.Slice(_pos, count);
+            for (int i = 0; i < dst.Length; i++)
+            {
+                dst[i] = c;
+            }
+            _pos += count;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Append(scoped ReadOnlySpan<T> source)
         {
             int pos = _pos;
@@ -89,6 +105,7 @@ namespace System.Collections.Generic
             _pos += source.Length;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Insert(int index, scoped ReadOnlySpan<T> source)
         {
             Debug.Assert(index == 0, "Implementation currently only supports index == 0");
@@ -102,6 +119,20 @@ namespace System.Collections.Generic
             source.CopyTo(_span);
             _pos += source.Length;
         }
+
+        public void Insert(int index, T value, int count)
+        {
+            if (_pos > _span.Length - count)
+            {
+                Grow(count);
+            }
+
+            int remaining = _pos - index;
+            _span.Slice(index, remaining).CopyTo(_span.Slice(index + count));
+            _span.Slice(index, count).Fill(value);
+            _pos += count;
+        }
+
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Span<T> AppendSpan(int length)
@@ -202,6 +233,13 @@ namespace System.Collections.Generic
             {
                 ArrayPool<T>.Shared.Return(toReturn);
             }
+        }
+
+        public string ToStringAndRelease()
+        {
+            var s = _span.Slice(0, _pos).ToString();
+            Dispose();
+            return s;
         }
     }
 }

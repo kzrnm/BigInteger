@@ -583,7 +583,7 @@ namespace Kzrnm.Numerics.Logic
             }
             bits = bits.Slice(0, bytesWrittenOrNeeded);
 
-            var sb = new ValueStringBuilder(stackalloc char[128]); // each byte is typically two chars
+            var sb = new ValueListBuilder<char>(stackalloc char[128]); // each byte is typically two chars
 
             int cur = bits.Length - 1;
             if (cur > -1)
@@ -647,7 +647,7 @@ namespace Kzrnm.Numerics.Logic
             {
                 charsWritten = 0;
                 spanSuccess = false;
-                return sb.ToString();
+                return sb.ToStringAndRelease();
             }
         }
 
@@ -686,7 +686,7 @@ namespace Kzrnm.Numerics.Logic
 
             try
             {
-                scoped ValueStringBuilder sb;
+                scoped ValueListBuilder<char> sb;
                 if (targetSpan)
                 {
                     if (charsIncludeDigits > destination.Length)
@@ -696,16 +696,16 @@ namespace Kzrnm.Numerics.Logic
                         return null;
                     }
 
-                    // Because we have ensured destination can take actual char length, so now just use ValueStringBuilder as wrapper so that subsequent logic can be reused by 2 flows (targetSpan and non-targetSpan);
+                    // Because we have ensured destination can take actual char length, so now just use ValueListBuilder<char> as wrapper so that subsequent logic can be reused by 2 flows (targetSpan and non-targetSpan);
                     // meanwhile there is no need to copy to destination again after format data for targetSpan flow.
-                    sb = new ValueStringBuilder(destination);
+                    sb = new ValueListBuilder<char>(destination);
                 }
                 else
                 {
                     // each byte is typically eight chars
                     sb = charsIncludeDigits > 512
-                        ? new ValueStringBuilder(charsIncludeDigits)
-                        : new ValueStringBuilder(stackalloc char[512]);
+                        ? new ValueListBuilder<char>(charsIncludeDigits)
+                        : new ValueListBuilder<char>(stackalloc char[512]);
                 }
 
                 if (digits > charsForBits)
@@ -731,7 +731,7 @@ namespace Kzrnm.Numerics.Logic
 
                 charsWritten = 0;
                 spanSuccess = false;
-                return sb.ToString();
+                return sb.ToStringAndRelease();
             }
             finally
             {
@@ -741,7 +741,7 @@ namespace Kzrnm.Numerics.Logic
                 }
             }
 
-            static void AppendByte(ref ValueStringBuilder sb, byte b, int startHighBit = 7)
+            static void AppendByte(ref ValueListBuilder<char> sb, byte b, int startHighBit = 7)
             {
                 for (int i = startHighBit; i >= 0; i--)
                 {
