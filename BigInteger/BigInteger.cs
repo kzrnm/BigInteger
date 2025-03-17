@@ -1649,6 +1649,9 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             return Number.FormatBigInteger(this, format, NumberFormatInfo.GetInstance(provider));
         }
 
+#if Embedding
+        [SourceExpander.NotEmbeddingSource]
+#endif
         private string DebuggerDisplay
         {
             get
