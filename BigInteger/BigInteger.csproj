@@ -1,14 +1,16 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFrameworks>net9.0;net8.0;net7.0</TargetFrameworks>
+		<TargetFrameworks>net9.0;net8.0;net7.0;netstandard2.0</TargetFrameworks>
 		<ImplicitUsings>disable</ImplicitUsings>
-		<Nullable>enable</Nullable>
+		<Nullable Condition="'$(TargetFramework)' != 'netstandard2.0'">enable</Nullable>
+		<Nullable Condition="'$(TargetFramework)' == 'netstandard2.0'">annotations</Nullable>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<RootNamespace>Kzrnm.Numerics</RootNamespace>
-		
+
 		<DotnetVersion>$([System.Version]::Parse($([MSBuild]::GetTargetFrameworkVersion('$(TargetFramework)'))).Major)</DotnetVersion>
 		<LangVersion Condition="'$(DotnetVersion)' != ''">$([MSBuild]::Add($(DotnetVersion), 4))</LangVersion>
+		<LangVersion Condition="'$(TargetFramework)' == 'netstandard2.0'">11</LangVersion>
 
 		<VersionPrefix>0.4.2</VersionPrefix>
 		<VersionSuffix></VersionSuffix>
@@ -39,6 +41,22 @@
 		<ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
 	</PropertyGroup>
 
+	<ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
+		<Compile Remove="Logic/Number/*.cs" />
+		<None Include="Logic/Number/*.cs" />
+		<PackageReference Include="System.Memory" Version="4.6.0" />
+		<PackageReference Include="Microsoft.Bcl.HashCode" Version="6.0.0" />
+		<PackageReference Include="PolySharp" Version="1.15.0">
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
+	</ItemGroup>
+
+	<ItemGroup Condition="'$(TargetFramework)' != 'netstandard2.0'">
+		<Compile Remove="Logic/Number.Standard/*.cs" />
+		<None Include="Logic/Number.Standard/*.cs" />
+	</ItemGroup>
+	
 	<ItemGroup>
 		<InternalsVisibleTo Include="BigInteger.Test" />
 		<PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0">

@@ -13,6 +13,7 @@ using System.Runtime.InteropServices;
 
 namespace Kzrnm.Numerics.Logic
 {
+    using static SR;
 #if Embedding
     public
 #else
@@ -43,8 +44,8 @@ namespace Kzrnm.Numerics.Logic
         private static Exception GetException(ParsingStatus status)
         {
             return status == ParsingStatus.Failed
-                ? new FormatException(SR.Overflow_ParseBigInteger)
-                : new OverflowException(SR.Overflow_ParseBigInteger);
+                ? new FormatException(Overflow_ParseBigInteger)
+                : new OverflowException(Overflow_ParseBigInteger);
         }
 
         internal static bool TryValidateParseStyleInteger(NumberStyles style, [NotNullWhen(false)] out ArgumentException? e)
@@ -52,14 +53,14 @@ namespace Kzrnm.Numerics.Logic
             // Check for undefined flags
             if ((style & InvalidNumberStyles) != 0)
             {
-                e = new ArgumentException(SR.Argument_InvalidNumberStyles, nameof(style));
+                e = new ArgumentException(Argument_InvalidNumberStyles, nameof(style));
                 return false;
             }
             if ((style & NumberStyles.AllowHexSpecifier) != 0)
             { // Check for hex number
                 if ((style & ~NumberStyles.HexNumber) != 0)
                 {
-                    e = new ArgumentException(SR.Argument_InvalidHexStyle, nameof(style));
+                    e = new ArgumentException(Argument_InvalidHexStyle, nameof(style));
                     return false;
                 }
             }
@@ -112,7 +113,7 @@ namespace Kzrnm.Numerics.Logic
 
             var number = new NumberBuffer(NumberBufferKind.Integer, buffer);
 
-            if (!TryStringToNumber(MemoryMarshal.Cast<char, Utf16Char>(value), style, ref number, info))
+            if (!NumberBuffer.TryStringToNumber(value, style, ref number, info))
             {
                 result = default;
                 ret = ParsingStatus.Failed;
@@ -148,6 +149,8 @@ namespace Kzrnm.Numerics.Logic
             where TParser : struct, IBigIntegerHexOrBinaryParser<TParser, T>
             where T : unmanaged, IBinaryInteger<T>
         {
+            static bool IsWhite(uint ch) => (ch == 0x20) || ((ch - 0x09) <= (0x0D - 0x09));
+
             int whiteIndex;
 
             // Skip past any whitespace at the beginning.
@@ -155,7 +158,7 @@ namespace Kzrnm.Numerics.Logic
             {
                 for (whiteIndex = 0; whiteIndex < value.Length; whiteIndex++)
                 {
-                    if (!IsWhite(uint.CreateTruncating(value[whiteIndex])))
+                    if (!IsWhite(CastToUInt32(value[whiteIndex])))
                         break;
                 }
 
@@ -167,7 +170,7 @@ namespace Kzrnm.Numerics.Logic
             {
                 for (whiteIndex = value.Length - 1; whiteIndex >= 0; whiteIndex--)
                 {
-                    if (!IsWhite(uint.CreateTruncating(value[whiteIndex])))
+                    if (!IsWhite(CastToUInt32(value[whiteIndex])))
                         break;
                 }
 
@@ -181,7 +184,7 @@ namespace Kzrnm.Numerics.Logic
 
             // Remember the sign from original leading input
             // Invalid digits will be caught in parsing below
-            uint signBits = TParser.GetSignBitsIfValid(uint.CreateTruncating(value[0]));
+            uint signBits = TParser.GetSignBitsIfValid(CastToUInt32(value[0]));
 
             // Start from leading blocks. Leading blocks can be unaligned, or whole of 0/F's that need to be trimmed.
             int leadingBitsCount = value.Length % TParser.DigitsPerBlock;
@@ -310,7 +313,7 @@ namespace Kzrnm.Numerics.Logic
         // of most common inputs and allows for the less naive algorithm to be used for
         // large/uncommon inputs.
         //
-#if DEBUG
+#if DEBUG && !Embedding
         // Mutable for unit testing...
         public static
 #else
@@ -373,7 +376,7 @@ namespace Kzrnm.Numerics.Logic
 #if NET8_0_OR_GREATER
                     uint.TryParse(leadingDigits, out base1E9[--di]);
 #else
-                    SR.UIntTryParse(leadingDigits, out base1E9[--di]);
+                    UIntTryParse(leadingDigits, out base1E9[--di]);
 #endif
                 }
 
@@ -385,7 +388,7 @@ namespace Kzrnm.Numerics.Logic
 #if NET8_0_OR_GREATER
                     uint.TryParse(intDigits.Slice(0, PowersOf1e9.MaxPartialDigits), out base1E9[di]);
 #else
-                    SR.UIntTryParse(intDigits.Slice(0, PowersOf1e9.MaxPartialDigits), out base1E9[di]);
+                    UIntTryParse(intDigits.Slice(0, PowersOf1e9.MaxPartialDigits), out base1E9[di]);
 #endif
                     intDigits = intDigits.Slice(PowersOf1e9.MaxPartialDigits);
                 }
@@ -465,7 +468,7 @@ namespace Kzrnm.Numerics.Logic
 
             static void Recursive(in PowersOf1e9 powersOf1e9, int powersOf1e9Index, ReadOnlySpan<uint> base1E9, Span<uint> bits)
             {
-                Debug.Assert(bits.Trim(0u).Length == 0);
+                Debug.Assert(!bits.ContainsAnyExcept(0u));
                 Debug.Assert(BigIntegerParseNaiveThresholdInRecursive > 1);
 
                 base1E9 = base1E9.Slice(0, BigIntegerCalculator.ActualLength(base1E9));
@@ -676,7 +679,7 @@ namespace Kzrnm.Numerics.Logic
                 Debug.Assert(arrayToReturnToPool is not null);
                 ArrayPool<byte>.Shared.Return(arrayToReturnToPool);
 
-                throw new FormatException(SR.Format_TooLarge);
+                throw new FormatException(Format_TooLarge);
             }
 
             int charsForBits = (int)tmpCharCount;
@@ -848,7 +851,7 @@ namespace Kzrnm.Numerics.Logic
                     else
                     {
                         sNegative?.CopyTo(destination);
-                        BigIntegerToDecChars(MemoryMarshal.Cast<char, Utf16Char>(destination.Slice(0, strLength)), base1E9Value, digits);
+                        BigIntegerToDecChars(destination.Slice(0, strLength), base1E9Value, digits);
                         charsWritten = strLength;
                         spanSuccess = true;
                     }
@@ -862,7 +865,7 @@ namespace Kzrnm.Numerics.Logic
                     strResult = string.Create(strLength, new StrState(digits, base1E9Value, sNegative), static (span, state) =>
                     {
                         state.sNegative?.CopyTo(span);
-                        BigIntegerToDecChars(MemoryMarshal.Cast<char, Utf16Char>(span), state.base1E9Value, state.digits);
+                        BigIntegerToDecChars(span, state.base1E9Value, state.digits);
                     });
 #else
                     char[]? numberBufferToReturn = null;
@@ -871,7 +874,7 @@ namespace Kzrnm.Numerics.Logic
                         (numberBufferToReturn = ArrayPool<char>.Shared.Rent(strLength))).Slice(0, strLength);
 
                     sNegative?.CopyTo(numberBuffer);
-                    BigIntegerToDecChars(MemoryMarshal.Cast<char, Utf16Char>(numberBuffer), base1E9Value, digits);
+                    BigIntegerToDecChars(numberBuffer, base1E9Value, digits);
 
                     strResult = new string(numberBuffer);
 
@@ -888,13 +891,13 @@ namespace Kzrnm.Numerics.Logic
                     (numberBufferToReturn = ArrayPool<byte>.Shared.Rent(valueDigits + 1));
 
                 scoped NumberBuffer number = new NumberBuffer(NumberBufferKind.Integer, numberBuffer);
-                BigIntegerToDecChars(MemoryMarshal.Cast<byte, Utf8Char>(numberBuffer), base1E9Value, valueDigits);
+                BigIntegerToDecChars(numberBuffer, base1E9Value, valueDigits);
                 number.Digits[^1] = 0;
                 number.DigitsCount = valueDigits;
                 number.Scale = valueDigits;
                 number.IsNegative = value.Sign < 0;
 
-                scoped var vlb = new ValueListBuilder<Utf16Char>(stackalloc Utf16Char[CharStackBufferSize]); // arbitrary stack cut-off
+                scoped var vlb = new ValueListBuilder<char>(stackalloc char[CharStackBufferSize]); // arbitrary stack cut-off
 
                 if (fmt != 0)
                 {
@@ -907,14 +910,14 @@ namespace Kzrnm.Numerics.Logic
 
                 if (targetSpan)
                 {
-                    spanSuccess = vlb.TryCopyTo(MemoryMarshal.Cast<char, Utf16Char>(destination), out charsWritten);
+                    spanSuccess = vlb.TryCopyTo(destination, out charsWritten);
                     strResult = null;
                 }
                 else
                 {
                     charsWritten = 0;
                     spanSuccess = false;
-                    strResult = MemoryMarshal.Cast<Utf16Char, char>(vlb.AsSpan()).ToString();
+                    strResult = vlb.AsSpan().ToString();
                 }
 
                 vlb.Dispose();
@@ -944,7 +947,7 @@ namespace Kzrnm.Numerics.Logic
 #endif
 
         private static int BigIntegerToDecChars<T>(Span<T> buffer, ReadOnlySpan<uint> base1E9Value, int digits)
-            where T : unmanaged, IUtfChar<T>
+            where T : unmanaged
         {
             Debug.Assert(base1E9Value[^1] != 0, "Leading zeros should be trimmed by caller.");
 
@@ -959,7 +962,7 @@ namespace Kzrnm.Numerics.Logic
             return UInt32ToDecChars(buffer, base1E9Value[^1], digits);
         }
 
-#if DEBUG
+#if DEBUG && !Embedding
         // Mutable for unit testing...
         public static
 #else
@@ -1029,7 +1032,7 @@ namespace Kzrnm.Numerics.Logic
                 bits.Slice(0, omittedLength).CopyTo(lower);
                 BigIntegerCalculator.Divide(bits.Slice(omittedLength), powOfTen, upper, lower.Slice(omittedLength));
 
-                Debug.Assert(!upper.Trim(0u).IsEmpty);
+                Debug.Assert(upper.ContainsAnyExcept(0u));
 
                 int lower1E9Length = 1 << powersIndex;
 
@@ -1072,13 +1075,16 @@ namespace Kzrnm.Numerics.Logic
 
                         // Use X86Base.DivRem when stable
                         ulong uuRes = NumericsHelpers.MakeUInt64(base1E9[iuDst], uCarry);
-                        (ulong quo, ulong rem) = Math.DivRem(uuRes, PowersOf1e9.TenPowMaxPartial);
+                        var quo = uuRes / PowersOf1e9.TenPowMaxPartial;
+                        var rem = uuRes - quo * PowersOf1e9.TenPowMaxPartial;
                         uCarry = (uint)quo;
                         base1E9[iuDst] = (uint)rem;
                     }
                     if (uCarry != 0)
                     {
-                        (uCarry, base1E9Buffer[base1E9Written++]) = Math.DivRem(uCarry, PowersOf1e9.TenPowMaxPartial);
+                        var quo = uCarry / PowersOf1e9.TenPowMaxPartial;
+                        base1E9Buffer[base1E9Written++] = uCarry - quo * PowersOf1e9.TenPowMaxPartial;
+                        uCarry = quo;
                         if (uCarry != 0)
                             base1E9Buffer[base1E9Written++] = uCarry;
                     }

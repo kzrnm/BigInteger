@@ -5,18 +5,31 @@ using System;
 using System.Buffers;
 using System.Diagnostics;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 
 namespace Kzrnm.Numerics.Decimal
 {
     static partial class BigIntegerCalculator
     {
-#if DEBUG
+#if DEBUG && !Embedding
         // Mutable for unit testing...
         internal static
 #else
         internal const
 #endif
         int DivideBurnikelZieglerThreshold = 32;
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static (ulong, ulong) DivRem(ulong a, ulong b)
+#if NET7_0_OR_GREATER
+            => Math.DivRem(a, b);
+#else
+        {
+            var quo = a / b;
+            var rem = a - quo * b;
+            return (quo, rem);
+        }
+#endif
 
         public static void Divide(ReadOnlySpan<uint> left, uint right, Span<uint> quotient, out uint remainder)
         {
@@ -46,7 +59,7 @@ namespace Kzrnm.Numerics.Decimal
             for (int i = left.Length - 1; i >= 0; i--)
             {
                 var ll = carry * Base + left[i];
-                (var q, carry) = Math.DivRem(ll, right);
+                (var q, carry) = DivRem(ll, right);
                 quotient[i] = (uint)q;
             }
         }
@@ -362,7 +375,7 @@ namespace Kzrnm.Numerics.Decimal
                 for (int i = 0; i < right.Length; i++)
                 {
                     carry += right[i] * q;
-                    (carry, var digit) = Math.DivRem(carry, Base);
+                    (carry, var digit) = DivRem(carry, Base);
                     ref var leftElement = ref left[i];
 
                     if (leftElement < digit)
@@ -386,7 +399,7 @@ namespace Kzrnm.Numerics.Decimal
 
                 ulong chkHi = divHi * q;
                 ulong chkLoT = divLo * q;
-                var (mi, chkLo) = Math.DivRem(chkLoT, Base);
+                var (mi, chkLo) = DivRem(chkLoT, Base);
 
                 chkHi += mi;
 
@@ -459,7 +472,7 @@ namespace Kzrnm.Numerics.Decimal
 
                     for (; i < dst.Length; i++)
                     {
-                        var (q, r) = Math.DivRem((ulong)dst[i] * sigmaMul + carry, Base);
+                        var (q, r) = DivRem((ulong)dst[i] * sigmaMul + carry, Base);
                         carry = q;
                         dst[i] = (uint)r;
                     }
@@ -498,7 +511,7 @@ namespace Kzrnm.Numerics.Decimal
 
                 BurnikelZieglerD2n1n(z, b, q, r);
 
-                Debug.Assert(q.Slice(quotientUpper.Length).Trim(0u).Length == 0);
+                Debug.Assert(!q.Slice(quotientUpper.Length).ContainsAnyExcept(0u));
                 q.Slice(0, quotientUpper.Length).CopyTo(quotientUpper);
 
                 if (qFromPool != null)
@@ -525,7 +538,7 @@ namespace Kzrnm.Numerics.Decimal
                 ArrayPool<uint>.Shared.Return(aFromPool);
 
             Debug.Assert(r[^1] == 0);
-            Debug.Assert(r.Slice(0, sigmaDigit).Trim(0u).Length == 0);
+            Debug.Assert(!r.Slice(0, sigmaDigit).ContainsAnyExcept(0u));
             if (remainder.Length != 0)
             {
                 Span<uint> rt = r.Slice(sigmaDigit);
@@ -536,7 +549,7 @@ namespace Kzrnm.Numerics.Decimal
                     ulong carry = 0;
                     for (int i = rt.Length - 1; i >= 0; i--)
                     {
-                        var (q, rem) = Math.DivRem(carry * Base + rt[i], sigmaMul);
+                        var (q, rem) = DivRem(carry * Base + rt[i], sigmaMul);
                         remainder[i] = (uint)q;
                         carry = rem;
                     }
@@ -614,7 +627,7 @@ namespace Kzrnm.Numerics.Decimal
                 }
                 else
                 {
-                    Debug.Assert(r1.Slice(remainder.Length).Trim(0u).Length == 0);
+                    Debug.Assert(!r1.Slice(remainder.Length).ContainsAnyExcept(0u));
                     r1.Slice(0, remainder.Length).CopyTo(remainder);
                 }
 

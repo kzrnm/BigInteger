@@ -5,7 +5,9 @@ using System;
 using System.Buffers;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+#if NET7_0_OR_GREATER
 using System.Runtime.Intrinsics;
+#endif
 
 namespace Kzrnm.Numerics.Logic
 {
@@ -23,14 +25,14 @@ namespace Kzrnm.Numerics.Logic
             if (rotateLeftAmount < 0)
             {
                 if (rotateLeftAmount != -0x80000000)
-                    (digitShift, smallShift) = Math.DivRem(-(int)rotateLeftAmount, 32);
+                    digitShift = Math.DivRem(-(int)rotateLeftAmount, 32, out smallShift);
 
                 RotateRight(bits, digitShift % bits.Length, smallShift);
             }
             else
             {
                 if (rotateLeftAmount != 0x80000000)
-                    (digitShift, smallShift) = Math.DivRem((int)rotateLeftAmount, 32);
+                    digitShift = Math.DivRem((int)rotateLeftAmount, 32, out smallShift);
 
                 RotateLeft(bits, digitShift % bits.Length, smallShift);
             }
@@ -107,6 +109,7 @@ namespace Kzrnm.Numerics.Logic
 
             int back = 32 - shift;
 
+#if NET7_0_OR_GREATER
             if (Vector128.IsHardwareAccelerated)
             {
                 carry = bits[^1] >> back;
@@ -157,6 +160,7 @@ namespace Kzrnm.Numerics.Logic
                 }
             }
             else
+#endif
             {
                 carry = 0;
                 for (int i = 0; i < bits.Length; i++)
@@ -177,6 +181,7 @@ namespace Kzrnm.Numerics.Logic
 
             int back = 32 - shift;
 
+#if NET7_0_OR_GREATER
             if (Vector128.IsHardwareAccelerated)
             {
                 carry = bits[0] << back;
@@ -228,6 +233,7 @@ namespace Kzrnm.Numerics.Logic
                 }
             }
             else
+#endif
             {
                 carry = 0;
                 for (int i = bits.Length - 1; i >= 0; i--)

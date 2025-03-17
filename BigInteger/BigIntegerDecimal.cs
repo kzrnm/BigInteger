@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Buffers;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
@@ -6,19 +6,24 @@ using System.Globalization;
 using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+#if NET7_0_OR_GREATER
 using System.Runtime.InteropServices;
+#endif
 
 namespace Kzrnm.Numerics
 {
     using Decimal;
+
     [DebuggerDisplay("{DebuggerDisplay,nq}")]
     public struct BigIntegerDecimal
         : IComparable,
-          IComparable<BigIntegerDecimal>,
-          IEquatable<BigIntegerDecimal>,
+#if NET7_0_OR_GREATER
           ISpanFormattable,
           INumber<BigIntegerDecimal>,
-          ISignedNumber<BigIntegerDecimal>
+          ISignedNumber<BigIntegerDecimal>,
+#endif
+          IComparable<BigIntegerDecimal>,
+          IEquatable<BigIntegerDecimal>
     {
         /*
          * Original is System.Numerics.BigInteger
@@ -69,14 +74,27 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             else if (value < B2)
             {
                 _sign = 1;
+#if NET7_0_OR_GREATER
                 var (q, r1) = Math.DivRem(value, B);
+#else
+                var q = value / B;
+                var r1 = value - q * B;
+#endif
                 _dig = new uint[] { (uint)r1, (uint)q };
             }
             else
             {
                 _sign = 1;
+#if NET7_0_OR_GREATER
                 var (q, r1) = Math.DivRem(value, B);
                 (q, var r2) = Math.DivRem(q, B);
+#else
+                var q = value / B;
+                var r1 = value - q * B;
+                value = q;
+                q = value / B;
+                var r2 = value - q * B;
+#endif
                 _dig = new uint[] { (uint)r1, (uint)r2, (uint)q };
             }
 
@@ -142,7 +160,13 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
 
         public static BigIntegerDecimal MinusOne { get { return s_bnMinusOneInt; } }
 
-        internal static int MaxLength => Array.MaxLength / sizeof(uint);
+        internal static int MaxLength =>
+#if NET7_0_OR_GREATER
+            Array.MaxLength
+#else
+            0X7FFFFFC7
+#endif
+            / sizeof(uint);
 
         public bool IsZero { get { AssertValid(); return _sign == 0; } }
 
@@ -172,7 +196,11 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
 
         public static BigIntegerDecimal Parse(string value, NumberStyles style, IFormatProvider? provider)
         {
+#if NET7_0_OR_GREATER
             ArgumentNullException.ThrowIfNull(value);
+#else
+            ThrowHelper.ThrowIfNull(value);
+#endif
             return Parse(value.AsSpan(), style, NumberFormatInfo.GetInstance(provider));
         }
 
@@ -200,52 +228,148 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
 
         public static bool TryParse(ReadOnlySpan<char> value, NumberStyles style, IFormatProvider? provider, out BigIntegerDecimal result)
         {
-            bool negative = false;
+            ValidateParseStyleInteger(style);
+
+            return TryParseBigIntegerNumber(value, style, NumberFormatInfo.GetInstance(provider), out result) == ParsingStatus.OK;
+        }
+        static ParsingStatus TryParseBigIntegerNumber(ReadOnlySpan<char> value, NumberStyles style, NumberFormatInfo info, out BigIntegerDecimal result)
+        {
+            scoped Span<byte> buffer;
+            byte[]? arrayFromPool = null;
+
             if (value.Length == 0)
             {
                 result = default;
-                return false;
+                return ParsingStatus.Failed;
             }
-            if (value[0] == '+')
-            {
-                value = value[1..];
-            }
-            if (value[0] == '-')
-            {
-                negative = true;
-                value = value[1..];
-            }
-            if (value.Length == 0)
+
+            int bufferLength = value.Length + 1 + 10;
+            buffer = bufferLength < 255
+                ? stackalloc byte[bufferLength]
+                : (arrayFromPool = ArrayPool<byte>.Shared.Rent(bufferLength));
+
+            ParsingStatus ret;
+
+            var number = new NumberBuffer(NumberBufferKind.Integer, buffer);
+
+            if (!NumberBuffer.TryStringToNumber(value, style, ref number, info))
             {
                 result = default;
-                return false;
+                ret = ParsingStatus.Failed;
+            }
+            else
+            {
+                ret = NumberToBigIntegerDecimal(ref number, out result);
             }
 
-            const int length = BigIntegerCalculator.BaseLog;
-            int di = 0;
-            var digits = new uint[(value.Length + length - 1) / length];
-            while (value.Length >= length)
+            if (arrayFromPool != null)
+                ArrayPool<byte>.Shared.Return(arrayFromPool);
+
+            return ret;
+        }
+
+        static ParsingStatus NumberToBigIntegerDecimal(ref NumberBuffer number, out BigIntegerDecimal result)
+        {
+            const uint B = BigIntegerCalculator.Base;
+            const int BaseLog = BigIntegerCalculator.BaseLog;
+            if (number.Scale == int.MaxValue)
             {
-                if (!uint.TryParse(value[^length..], out var d))
-                {
-                    result = default;
-                    return false;
-                }
-                digits[di++] = d;
-                value = value[..^length];
-            }
-            if (value.Length > 0)
-            {
-                if (!uint.TryParse(value, out var d))
-                {
-                    result = default;
-                    return false;
-                }
-                digits[di++] = d;
+                result = default;
+                return ParsingStatus.Overflow;
             }
 
-            result = new BigIntegerDecimal(digits, negative);
-            return true;
+            if (number.Scale < 0)
+            {
+                result = default;
+                return ParsingStatus.Failed;
+            }
+
+            int totalDigitCount = Math.Min(number.DigitsCount, number.Scale);
+            int trailingZeroCount = number.Scale - totalDigitCount;
+            {
+                trailingZeroCount = Math.DivRem(trailingZeroCount, BaseLog, out int trailing);
+
+                for (int i = 0; i < trailing; i++)
+                    number.Digits[number.DigitsCount++] = (byte)'0';
+                number.Digits[number.DigitsCount] = 0;
+            }
+
+            ReadOnlySpan<byte> intDigits = number.Digits.Slice(0, Math.Min(number.Scale, number.DigitsCount));
+            int intDigitsEnd = intDigits.IndexOf<byte>(0);
+            if (intDigitsEnd < 0)
+            {
+                // Check for nonzero digits after the decimal point.
+                ReadOnlySpan<byte> fracDigitsSpan = number.Digits.Slice(intDigits.Length);
+                foreach (byte digitChar in fracDigitsSpan)
+                {
+                    if (digitChar == '\0')
+                    {
+                        break;
+                    }
+                    if (digitChar != '0')
+                    {
+                        result = default;
+                        return ParsingStatus.Failed;
+                    }
+                }
+            }
+            else
+                intDigits = intDigits.Slice(0, intDigitsEnd);
+
+            int base1E9Length = trailingZeroCount + (intDigits.Length + BaseLog - 1) / BaseLog;
+            var base1E9 = new uint[base1E9Length];
+
+            int di = base1E9Length;
+            var leadingDigits = intDigits[..(intDigits.Length % BaseLog)];
+
+            if (leadingDigits.Length != 0)
+            {
+#if NET8_0_OR_GREATER
+                uint.TryParse(leadingDigits, out base1E9[--di]);
+#else
+                SR.UIntTryParse(leadingDigits, out base1E9[--di]);
+#endif
+                intDigits = intDigits.Slice(leadingDigits.Length);
+            }
+
+            for (--di; di >= trailingZeroCount; --di)
+            {
+#if NET8_0_OR_GREATER
+                uint.TryParse(intDigits.Slice(0, BaseLog), out base1E9[di]);
+#else
+                SR.UIntTryParse(intDigits.Slice(0, BaseLog), out base1E9[di]);
+#endif
+                intDigits = intDigits.Slice(BaseLog);
+            }
+            Debug.Assert(intDigits.Length == 0);
+
+            if (base1E9.Length == 0)
+                result = default;
+            else if (base1E9.Length == 1)
+            {
+                var v = base1E9[0];
+                result = v < B
+                    ? new BigIntegerDecimal((number.IsNegative ? -1 : 1) * (int)v, null)
+                    : new BigIntegerDecimal(number.IsNegative ? -1 : 1, base1E9);
+            }
+            else
+                result = new BigIntegerDecimal(number.IsNegative ? -1 : 1, base1E9);
+
+            return ParsingStatus.OK;
+        }
+        static void ValidateParseStyleInteger(NumberStyles style)
+        {
+            // Check for undefined flags
+            const NumberStyles InvalidNumberStyles = ~(NumberStyles.AllowLeadingWhite | NumberStyles.AllowTrailingWhite
+                                                          | NumberStyles.AllowLeadingSign | NumberStyles.AllowTrailingSign
+                                                          | NumberStyles.AllowParentheses | NumberStyles.AllowDecimalPoint
+                                                          | NumberStyles.AllowThousands | NumberStyles.AllowExponent
+                                                          | NumberStyles.AllowCurrencySymbol);
+
+            if ((style & InvalidNumberStyles) != 0)
+                Throw();
+            void Throw()
+                => throw new ArgumentException(SR.Argument_InvalidNumberStyles, nameof(style));
         }
 
         public static int Compare(BigIntegerDecimal left, BigIntegerDecimal right)
@@ -613,7 +737,12 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
                 return _sign;
 
             HashCode hash = default;
+#if NET7_0_OR_GREATER
             hash.AddBytes(MemoryMarshal.AsBytes(_dig.AsSpan()));
+#else
+            foreach (var v in _dig.AsSpan())
+                hash.Add(v);
+#endif
             hash.Add(_sign);
             return hash.ToHashCode();
         }
@@ -669,11 +798,19 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
 
         public override string ToString()
         {
+            const int BaseLog = BigIntegerCalculator.BaseLog;
             if (_dig == null)
             {
                 return _sign.ToString();
             }
-            var length = BigIntegerCalculator.BaseLog * _dig.Length;
+#if NET9_0_OR_GREATER
+            var length = BaseLog * (_dig.Length - 1) + CountDigits(_dig[^1]);
+            if (_sign < 0)
+                ++length;
+
+            return string.Create(length, this, (chars, bd) => bd.TryFormat(chars, out _));
+#else
+            var length = BaseLog * (_dig.Length - 1) + CountDigits(_dig[^1]);
             if (_sign < 0)
                 ++length;
             char[]? chars = null;
@@ -683,7 +820,46 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             if (!TryFormat(sb, out int charsWritten))
                 throw new FormatException();
 
-            return new string(sb[..charsWritten]);
+            Debug.Assert(charsWritten == length);
+            return sb[..charsWritten].ToString();
+#endif
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static int CountDigits(uint value)
+        {
+            long tableValue = BitOperations.Log2(value) switch
+            {
+                0 => 4294967296,
+                1 => 8589934582,
+                2 => 8589934582,
+                3 => 8589934582,
+                4 => 12884901788,
+                5 => 12884901788,
+                6 => 12884901788,
+                7 => 17179868184,
+                8 => 17179868184,
+                9 => 17179868184,
+                10 => 21474826480,
+                11 => 21474826480,
+                12 => 21474826480,
+                13 => 21474826480,
+                14 => 25769703776,
+                15 => 25769703776,
+                16 => 25769703776,
+                17 => 30063771072,
+                18 => 30063771072,
+                19 => 30063771072,
+                20 => 34349738368,
+                21 => 34349738368,
+                22 => 34349738368,
+                23 => 34349738368,
+                24 => 38554705664,
+                25 => 38554705664,
+                26 => 38554705664,
+                _ => 41949672960,
+            };
+            return (int)((value + tableValue) >> 32);
         }
 
         public string ToString(IFormatProvider? provider)
@@ -724,6 +900,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
 
         public bool TryFormat(Span<char> destination, out int charsWritten, [StringSyntax(StringSyntaxAttribute.NumericFormat)] ReadOnlySpan<char> format = default, IFormatProvider? provider = null)
         {
+            const int BaseLog = BigIntegerCalculator.BaseLog;
             if (_dig == null)
             {
                 return _sign.TryFormat(destination, out charsWritten);
@@ -735,8 +912,8 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
                 return false;
             }
             firstBuffer = firstBuffer[..first];
-            var digits = _dig[..^1];
-            charsWritten = first + digits.Length * BigIntegerCalculator.BaseLog + (_sign < 0 ? 1 : 0);
+            var digits = _dig.AsSpan(0, _dig.Length - 1);
+            charsWritten = first + digits.Length * BaseLog + (_sign < 0 ? 1 : 0);
             if (destination.Length < charsWritten)
             {
                 charsWritten = 0;
@@ -756,7 +933,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             for (int i = digits.Length - 1; i >= 0; i--)
             {
                 digits[i].TryFormat(destination, out _, "D9");
-                destination = destination[BigIntegerCalculator.BaseLog..];
+                destination = destination[BaseLog..];
             }
 
             return true;
@@ -981,6 +1158,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             throw new OverflowException(SR.Overflow_Int64);
         }
 
+#if NET7_0_OR_GREATER
         /// <summary>Explicitly converts a big integer to a <see cref="Int128" /> value.</summary>
         /// <param name="value">The value to convert.</param>
         /// <returns><paramref name="value" /> converted to <see cref="Int128" /> value.</returns>
@@ -1025,6 +1203,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             }
             throw new OverflowException(SR.Overflow_Int64);
         }
+#endif
 
         public static explicit operator sbyte(BigIntegerDecimal value)
         {
@@ -1084,6 +1263,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             return uu;
         }
 
+#if NET7_0_OR_GREATER
         /// <summary>Explicitly converts a big integer to a <see cref="UInt128" /> value.</summary>
         /// <param name="value">The value to convert.</param>
         /// <returns><paramref name="value" /> converted to <see cref="UInt128" /> value.</returns>
@@ -1120,6 +1300,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             }
             return uu;
         }
+#endif
 
 
         //
@@ -1154,6 +1335,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             return new BigIntegerDecimal(value);
         }
 
+#if NET7_0_OR_GREATER
         /// <summary>Implicitly converts a <see cref="Int128" /> value to a big integer.</summary>
         /// <param name="value">The value to convert.</param>
         /// <returns><paramref name="value" /> converted to a big integer.</returns>
@@ -1167,6 +1349,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             }
             return (BigIntegerDecimal)(UInt128)value;
         }
+#endif
 
         public static implicit operator BigIntegerDecimal(sbyte value)
         {
@@ -1188,6 +1371,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             return new BigIntegerDecimal(value);
         }
 
+#if NET7_0_OR_GREATER
         /// <summary>Implicitly converts a <see cref="UInt128" /> value to a big integer.</summary>
         /// <param name="value">The value to convert.</param>
         /// <returns><paramref name="value" /> converted to a big integer.</returns>
@@ -1201,6 +1385,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
 
             return new BigIntegerDecimal(stackalloc uint[3] { (uint)rem0, (uint)rem1, rem2 }, false);
         }
+#endif
 
         public static BigIntegerDecimal operator -(BigIntegerDecimal value)
         {
@@ -1290,19 +1475,6 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
                                 : digitsFromPool = ArrayPool<uint>.Shared.Rent(size)).Slice(0, size);
 
                 BigIntegerCalculator.Square(left, bits);
-                result = new BigIntegerDecimal(bits, (leftSign < 0) ^ (rightSign < 0));
-            }
-            else if (left.Length < right.Length)
-            {
-                Debug.Assert(!left.IsEmpty && !right.IsEmpty);
-
-                int size = left.Length + right.Length;
-                Span<uint> bits = ((uint)size <= BigIntegerCalculator.StackAllocThreshold
-                                ? stackalloc uint[BigIntegerCalculator.StackAllocThreshold]
-                                : digitsFromPool = ArrayPool<uint>.Shared.Rent(size)).Slice(0, size);
-                bits.Clear();
-
-                BigIntegerCalculator.Multiply(right, left, bits);
                 result = new BigIntegerDecimal(bits, (leftSign < 0) ^ (rightSign < 0));
             }
             else
@@ -1612,6 +1784,14 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             }
         }
 
+        /// <inheritdoc cref="IBinaryInteger{TSelf}.DivRem(TSelf, TSelf)" />
+        public static (BigIntegerDecimal Quotient, BigIntegerDecimal Remainder) DivRem(BigIntegerDecimal left, BigIntegerDecimal right)
+        {
+            BigIntegerDecimal quotient = DivRem(left, right, out BigIntegerDecimal remainder);
+            return (quotient, remainder);
+        }
+
+#if NET7_0_OR_GREATER
         //
         // IAdditiveIdentity
         //
@@ -1622,12 +1802,6 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
         // IBinaryInteger
         //
 
-        /// <inheritdoc cref="IBinaryInteger{TSelf}.DivRem(TSelf, TSelf)" />
-        public static (BigIntegerDecimal Quotient, BigIntegerDecimal Remainder) DivRem(BigIntegerDecimal left, BigIntegerDecimal right)
-        {
-            BigIntegerDecimal quotient = DivRem(left, right, out BigIntegerDecimal remainder);
-            return (quotient, remainder);
-        }
 
         //
         // IMultiplicativeIdentity
@@ -1777,6 +1951,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             }
             return (value._dig[0] & 1) == 0;
         }
+
 
         /// <inheritdoc cref="INumberBase{TSelf}.IsFinite(TSelf)" />
         static bool INumberBase<BigIntegerDecimal>.IsFinite(BigIntegerDecimal value) => true;
@@ -2367,12 +2542,6 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
                 return false;
             }
         }
-        //
-        // IParsable
-        //
-
-        /// <inheritdoc cref="IParsable{TSelf}.TryParse(string?, IFormatProvider?, out TSelf)" />
-        public static bool TryParse([NotNullWhen(true)] string? s, IFormatProvider? provider, out BigIntegerDecimal result) => TryParse(s, NumberStyles.Integer, provider, out result);
 
         //
         // ISignedNumber
@@ -2380,6 +2549,14 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
 
         /// <inheritdoc cref="ISignedNumber{TSelf}.NegativeOne" />
         static BigIntegerDecimal ISignedNumber<BigIntegerDecimal>.NegativeOne => MinusOne;
+#endif
+        //
+        // IParsable
+        //
+
+        /// <inheritdoc cref="IParsable{TSelf}.TryParse(string?, IFormatProvider?, out TSelf)" />
+        public static bool TryParse([NotNullWhen(true)] string? s, IFormatProvider? provider, out BigIntegerDecimal result) => TryParse(s, NumberStyles.Integer, provider, out result);
+
         //
         // ISpanParsable
         //

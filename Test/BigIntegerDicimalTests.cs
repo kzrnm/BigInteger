@@ -1,4 +1,4 @@
-﻿using Kzrnm.Numerics.Logic;
+using Kzrnm.Numerics.Logic;
 
 namespace Kzrnm.Numerics.Test
 {
@@ -19,8 +19,8 @@ namespace Kzrnm.Numerics.Test
                 var left = q * right + rem;
 
                 var (q2, r2) = BigIntegerDecimal.DivRem(left, right);
-                q2.Should().Be(q);
-                r2.Should().Be(rem);
+                q2.ShouldBe(q);
+                r2.ShouldBe(rem);
             }
         }
     }

@@ -1,17 +1,112 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+using Kzrnm.Numerics.Logic;
 using System;
 using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 
-namespace Kzrnm.Numerics.Logic
+namespace Kzrnm.Numerics
 {
-    static partial class Number
+    using static SR;
+    internal ref struct NumberBuffer
     {
+        public int DigitsCount;
+        public int Scale;
+        public bool IsNegative;
+        public bool HasNonZeroTail;
+        public NumberBufferKind Kind;
+        public Span<byte> Digits;
+
+
+        /// <summary>Initializes the NumberBuffer.</summary>
+        /// <param name="kind">The kind of the buffer.</param>
+        /// <param name="digits">The digits scratch space. The referenced memory must not be moveable, e.g. stack memory, pinned array, etc.</param>
+        public NumberBuffer(NumberBufferKind kind, Span<byte> digits)
+        {
+            Debug.Assert(!digits.IsEmpty);
+
+            DigitsCount = 0;
+            Scale = 0;
+            IsNegative = false;
+            HasNonZeroTail = false;
+            Kind = kind;
+            Digits = digits;
+            InitializeForDebug();
+            Digits[0] = (byte)'\0';
+            CheckConsistency();
+        }
+
+        [Conditional("DEBUG")]
+        public void InitializeForDebug()
+        {
+            Digits.Fill(0xCC);
+        }
+
+#pragma warning disable CA1822
+        [Conditional("DEBUG")]
+        public void CheckConsistency()
+        {
+            Debug.Assert((Kind == NumberBufferKind.Integer) || (Kind == NumberBufferKind.Decimal) || (Kind == NumberBufferKind.FloatingPoint));
+            Debug.Assert(Digits[0] != '0', "Leading zeros should never be stored in a Number");
+
+            int numDigits;
+            for (numDigits = 0; numDigits < Digits.Length; numDigits++)
+            {
+                byte digit = Digits[numDigits];
+
+                if (digit == 0)
+                {
+                    break;
+                }
+
+                Debug.Assert(digit - '0' < 10, $"Unexpected character found in Number: {digit}");
+            }
+
+            Debug.Assert(numDigits == DigitsCount, "Null terminator found in unexpected location in Number");
+            Debug.Assert(numDigits < Digits.Length, "Null terminator not found in Number");
+        }
+#pragma warning restore CA1822
+
+        //
+        // Code coverage note: This only exists so that Number displays nicely in the VS watch window. So yes, I know it works.
+        //
+#if Embedding
+        [SourceExpander.NotEmbeddingSource]
+#endif
+        public override string ToString()
+        {
+            var sb = new System.Text.StringBuilder();
+
+            sb.Append('[');
+            sb.Append('"');
+
+            for (int i = 0; i < Digits.Length; i++)
+            {
+                byte digit = Digits[i];
+
+                if (digit == 0)
+                {
+                    break;
+                }
+
+                sb.Append((char)(digit));
+            }
+
+            sb.Append('"');
+            sb.Append(", Length = ").Append(DigitsCount);
+            sb.Append(", Scale = ").Append(Scale);
+            sb.Append(", IsNegative = ").Append(IsNegative);
+            sb.Append(", HasNonZeroTail = ").Append(HasNonZeroTail);
+            sb.Append(", Kind = ").Append(Kind);
+            sb.Append(']');
+
+            return sb.ToString();
+        }
+
         private static bool TryParseNumber<T>(ref ReadOnlySpan<T> str, NumberStyles styles, ref NumberBuffer number, NumberFormatInfo info)
-            where T : unmanaged, IUtfChar<T>
+            where T : unmanaged
         {
             Debug.Assert((styles & (NumberStyles.AllowHexSpecifier
 #if NET8_0_OR_GREATER
@@ -56,7 +151,7 @@ namespace Kzrnm.Numerics.Logic
 
             int state = 0;
             var p = str;
-            uint ch = p.Length > 0 ? T.CastToUInt32(p[0]) : '\0';
+            uint ch = p.Length > 0 ? CastToUInt32(p[0]) : '\0';
             int len;
 
             while (true)
@@ -89,7 +184,7 @@ namespace Kzrnm.Numerics.Logic
                         break;
                     }
                 }
-                ch = p.Length > 0 ? T.CastToUInt32(p[0]) : '\0';
+                ch = p.Length > 0 ? CastToUInt32(p[0]) : '\0';
             }
 
             int digCount = 0;
@@ -164,7 +259,7 @@ namespace Kzrnm.Numerics.Logic
                 {
                     break;
                 }
-                ch = p.Length > 0 ? T.CastToUInt32(p[0]) : '\0';
+                ch = p.Length > 0 ? CastToUInt32(p[0]) : '\0';
             }
 
             bool negExp = false;
@@ -176,14 +271,14 @@ namespace Kzrnm.Numerics.Logic
                 {
                     var temp = p;
                     p = p[1..];
-                    ch = p.Length > 0 ? T.CastToUInt32(p[0]) : '\0';
+                    ch = p.Length > 0 ? CastToUInt32(p[0]) : '\0';
                     if ((len = MatchChars(p, info.PositiveSignTChar<T>())) >= 0)
                     {
-                        ch = (p = p[^len..]).Length > 0 ? T.CastToUInt32(p[0]) : '\0';
+                        ch = (p = p[^len..]).Length > 0 ? CastToUInt32(p[0]) : '\0';
                     }
                     else if ((len = MatchNegativeSignChars(p, info)) >= 0)
                     {
-                        ch = (p = p[^len..]).Length > 0 ? T.CastToUInt32(p[0]) : '\0';
+                        ch = (p = p[^len..]).Length > 0 ? CastToUInt32(p[0]) : '\0';
                         negExp = true;
                     }
                     if (IsDigit(ch))
@@ -202,14 +297,14 @@ namespace Kzrnm.Numerics.Logic
                                 while (IsDigit(ch))
                                 {
                                     p = p[1..];
-                                    ch = p.Length > 0 ? T.CastToUInt32(p[0]) : '\0';
+                                    ch = p.Length > 0 ? CastToUInt32(p[0]) : '\0';
                                 }
                                 break;
                             }
 
                             exp = (exp * 10) + (int)(ch - '0');
                             p = p[1..];
-                            ch = p.Length > 0 ? T.CastToUInt32(p[0]) : '\0';
+                            ch = p.Length > 0 ? CastToUInt32(p[0]) : '\0';
                         } while (IsDigit(ch));
                         if (negExp)
                         {
@@ -220,7 +315,7 @@ namespace Kzrnm.Numerics.Logic
                     else
                     {
                         p = temp;
-                        ch = p.Length > 0 ? T.CastToUInt32(p[0]) : '\0';
+                        ch = p.Length > 0 ? CastToUInt32(p[0]) : '\0';
                     }
                 }
 
@@ -261,7 +356,7 @@ namespace Kzrnm.Numerics.Logic
                             break;
                         }
                     }
-                    ch = p.Length > 0 ? T.CastToUInt32(p[0]) : '\0';
+                    ch = p.Length > 0 ? CastToUInt32(p[0]) : '\0';
                 }
                 if ((state & StateParens) == 0)
                 {
@@ -285,7 +380,7 @@ namespace Kzrnm.Numerics.Logic
         }
 
         internal static bool TryStringToNumber<T>(ReadOnlySpan<T> value, NumberStyles styles, ref NumberBuffer number, NumberFormatInfo info)
-            where T : unmanaged, IUtfChar<T>
+            where T : unmanaged, IEquatable<T>
         {
             Debug.Assert(info != null);
 
@@ -304,10 +399,10 @@ namespace Kzrnm.Numerics.Logic
 
         [MethodImpl(MethodImplOptions.NoInlining)] // rare slow path that shouldn't impact perf of the main use case
         private static bool TrailingZeros<T>(ReadOnlySpan<T> value, int index)
-            where T : unmanaged, IUtfChar<T>
+            where T : unmanaged, IEquatable<T>
         {
             // For compatibility, we need to allow trailing zeros at the end of a number string
-            return !value.Slice(index).ContainsAnyExcept(T.CastFrom('\0'));
+            return !value.Slice(index).ContainsAnyExcept(CastFrom<T>('\0'));
         }
 
         private static bool IsWhite(uint ch) => (ch == 0x20) || ((ch - 0x09) <= (0x0D - 0x09));
@@ -318,13 +413,13 @@ namespace Kzrnm.Numerics.Logic
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static int MatchNegativeSignChars<T>(ReadOnlySpan<T> p, NumberFormatInfo info)
-            where T : unmanaged, IUtfChar<T>
+            where T : unmanaged
         {
             // returns remaining p
 
             var len = MatchChars(p, info.NegativeSignTChar<T>());
 
-            if ((len < 0) && info.AllowHyphenDuringParsing() && p.Length > 0 && (T.CastToUInt32(p[0]) == '-'))
+            if ((len < 0) && info.AllowHyphenDuringParsing() && p.Length > 0 && (CastToUInt32(p[0]) == '-'))
             {
                 len = p.Length - 1;
             }
@@ -333,7 +428,7 @@ namespace Kzrnm.Numerics.Logic
         }
 
         private static int MatchChars<T>(ReadOnlySpan<T> p, ReadOnlySpan<T> value)
-            where T : unmanaged, IUtfChar<T>
+            where T : unmanaged
         {
             // returns remaining p
 
@@ -344,8 +439,8 @@ namespace Kzrnm.Numerics.Logic
                 // space character we use 0x20 space character instead to mean the same.
                 while (true)
                 {
-                    uint cp = p.IsEmpty ? '\0' : T.CastToUInt32(p[0]);
-                    uint val = T.CastToUInt32(value[0]);
+                    uint cp = p.IsEmpty ? '\0' : CastToUInt32(p[0]);
+                    uint val = CastToUInt32(value[0]);
 
                     if ((cp != val) && !(IsSpaceReplacingChar(val) && (cp == '\u0020')))
                     {

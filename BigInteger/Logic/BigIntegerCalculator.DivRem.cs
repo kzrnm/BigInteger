@@ -10,7 +10,7 @@ namespace Kzrnm.Numerics.Logic
 {
     static partial class BigIntegerCalculator
     {
-#if DEBUG
+#if DEBUG && !Embedding
         // Mutable for unit testing...
         internal static
 #else

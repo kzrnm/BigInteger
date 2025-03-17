@@ -1,4 +1,4 @@
-﻿using Kzrnm.Numerics.Logic;
+using Kzrnm.Numerics.Logic;
 using System.Globalization;
 using System.Numerics;
 
@@ -21,8 +21,8 @@ namespace Kzrnm.Numerics.Test
                 var left = q * right + rem;
 
                 var (q2, r2) = BigInteger.DivRem(left, right);
-                q2.Should().Be(q);
-                r2.Should().Be(rem);
+                q2.ShouldBe(q);
+                r2.ShouldBe(rem);
             }
         }
 
@@ -35,18 +35,18 @@ namespace Kzrnm.Numerics.Test
             for (int i = 0; i < 13; i++)
             {
                 var powers = powersOf1e9.GetSpan(i);
-                (BitOperations.TrailingZeroCount(powers[0]) + 32 * Number.PowersOf1e9.OmittedLength(i)).Should().Be(9 * (1 << i));
+                (BitOperations.TrailingZeroCount(powers[0]) + 32 * Number.PowersOf1e9.OmittedLength(i)).ShouldBe(9 * (1 << i));
                 for (int j = (1 << i) - 1; j >= 0; j--)
                 {
                     var quo = new uint[powers.Length];
                     BigIntegerCalculator.Divide(powers, f9, quo, out var remainder);
-                    remainder.Should().Be(0);
+                    remainder.ShouldBe(0u);
                     powers = quo.AsSpan().TrimEnd(0u);
                 }
 
-                powers.Length.Should().Be(1);
+                powers.Length.ShouldBe(1);
                 int shift = (9 * (1 << i) - 32 * Number.PowersOf1e9.OmittedLength(i));
-                powers[0].Should().Be(1u << shift);
+                powers[0].ShouldBe(1u << shift);
             }
         }
 
@@ -61,20 +61,20 @@ namespace Kzrnm.Numerics.Test
             for (int i = 1; i < 300; i++)
             {
                 BigInteger.TryParse("F" + new string('0', i - 1) + "1", NumberStyles.HexNumber, null, out var result);
-                result.Should().Be((BigInteger.MinusOne << (4 * i)) + 1);
+                result.ShouldBe((BigInteger.MinusOne << (4 * i)) + 1);
             }
             for (int i = 0; i < 300; i++)
             {
                 for (int j = 1; j < 6; j++)
                 {
                     BigInteger.TryParse(new string('F', j) + new string('0', i), NumberStyles.HexNumber, null, out var result);
-                    result.Should().Be(BigInteger.MinusOne << (4 * i));
+                    result.ShouldBe(BigInteger.MinusOne << (4 * i));
                 }
             }
             for (int i = 0; i < 300; i++)
             {
                 BigInteger.TryParse("8" + new string('0', i), NumberStyles.HexNumber, null, out var result);
-                result.Should().Be(BigInteger.MinusOne << (3 + 4 * i));
+                result.ShouldBe(BigInteger.MinusOne << (3 + 4 * i));
             }
 
             var rnd = new Random(227);
@@ -82,7 +82,7 @@ namespace Kzrnm.Numerics.Test
             {
                 for (int k = 0; k < 60; k++)
                 {
-                    var s = Enumerable.Repeat(rnd, len).Select(rnd => ToCharUpper(rnd.Next())).ToArray();
+                    var s = new string(Enumerable.Repeat(rnd, len).Select(rnd => ToCharUpper(rnd.Next())).ToArray());
                     Equal(BigInteger.Parse(s, NumberStyles.HexNumber), OrigBigInteger.Parse(s, NumberStyles.HexNumber));
                 }
             }
@@ -104,16 +104,16 @@ namespace Kzrnm.Numerics.Test
         [Fact]
         public void ParseBin()
         {
-            BigInteger.Parse("0", NumberStyles.BinaryNumber).Should().Be(0);
-            BigInteger.Parse("0111111111111111111111111111111111", NumberStyles.BinaryNumber).Should().Be(0x1FFFFFFFFL);
-            BigInteger.Parse("111111111111111111111111111111110", NumberStyles.BinaryNumber).Should().Be(-2);
-            BigInteger.Parse("100000000000000000000000000000001", NumberStyles.BinaryNumber).Should().Be((-1L << 32) + 1);
-            BigInteger.Parse("100000000000000000000000000000000", NumberStyles.BinaryNumber).Should().Be(-1L << 32);
+            BigInteger.Parse("0", NumberStyles.BinaryNumber).ShouldBe(0);
+            BigInteger.Parse("0111111111111111111111111111111111", NumberStyles.BinaryNumber).ShouldBe(0x1FFFFFFFFL);
+            BigInteger.Parse("111111111111111111111111111111110", NumberStyles.BinaryNumber).ShouldBe(-2);
+            BigInteger.Parse("100000000000000000000000000000001", NumberStyles.BinaryNumber).ShouldBe((-1L << 32) + 1);
+            BigInteger.Parse("100000000000000000000000000000000", NumberStyles.BinaryNumber).ShouldBe(-1L << 32);
 
             for (int i = 0; i < 300; i++)
             {
                 BigInteger.TryParse("1" + new string('0', i), NumberStyles.BinaryNumber, null, out var result);
-                result.Should().Be(BigInteger.MinusOne << i);
+                result.ShouldBe(BigInteger.MinusOne << i);
             }
 
             var rnd = new Random(227);
@@ -142,8 +142,11 @@ namespace Kzrnm.Numerics.Test
                 bytes1.AsSpan().Fill(255);
                 bytes2[^1] = 0x80;
 
-                var (quo, rem) = OrigBigInteger.DivRem(new(bytes1, isUnsigned: true), new(bytes2, isUnsigned: true));
-                var (quo2, rem2) = BigInteger.DivRem(new(bytes1, isUnsigned: true), new(bytes2, isUnsigned: true));
+                var left = new BigInteger(bytes1, isUnsigned: true);
+                var right = new BigInteger(bytes2, isUnsigned: true);
+
+                var quo = OrigBigInteger.DivRem(left, right, out var rem);
+                var (quo2, rem2) = BigInteger.DivRem(left, right);
                 Equal(quo2, quo);
                 Equal(rem2, rem);
             }
@@ -155,8 +158,11 @@ namespace Kzrnm.Numerics.Test
                 rnd.NextBytes(bytes1);
                 bytes2[^1] = 0x80;
 
-                var (quo, rem) = OrigBigInteger.DivRem(new(bytes1, isUnsigned: true), new(bytes2, isUnsigned: true));
-                var (quo2, rem2) = BigInteger.DivRem(new(bytes1, isUnsigned: true), new(bytes2, isUnsigned: true));
+                var left = new BigInteger(bytes1, isUnsigned: true);
+                var right = new BigInteger(bytes2, isUnsigned: true);
+
+                var quo = OrigBigInteger.DivRem(left, right, out var rem);
+                var (quo2, rem2) = BigInteger.DivRem(left, right);
                 Equal(quo2, quo);
                 Equal(rem2, rem);
             }
@@ -168,8 +174,11 @@ namespace Kzrnm.Numerics.Test
                 rnd.NextBytes(bytes1);
                 rnd.NextBytes(bytes2);
 
-                var (quo, rem) = OrigBigInteger.DivRem(new(bytes1, isUnsigned: true), new(bytes2, isUnsigned: true));
-                var (quo2, rem2) = BigInteger.DivRem(new(bytes1, isUnsigned: true), new(bytes2, isUnsigned: true));
+                var left = new BigInteger(bytes1, isUnsigned: true);
+                var right = new BigInteger(bytes2, isUnsigned: true);
+
+                var quo = OrigBigInteger.DivRem(left, right, out var rem);
+                var (quo2, rem2) = BigInteger.DivRem(left, right);
                 Equal(quo2, quo);
                 Equal(rem2, rem);
             }
@@ -181,8 +190,11 @@ namespace Kzrnm.Numerics.Test
                 rnd.NextBytes(bytes1);
                 rnd.NextBytes(bytes2);
 
-                var (quo, rem) = OrigBigInteger.DivRem(new(bytes1, isUnsigned: true), new(bytes2, isUnsigned: true));
-                var (quo2, rem2) = BigInteger.DivRem(new(bytes1, isUnsigned: true), new(bytes2, isUnsigned: true));
+                var left = new BigInteger(bytes1, isUnsigned: true);
+                var right = new BigInteger(bytes2, isUnsigned: true);
+
+                var quo = OrigBigInteger.DivRem(left, right, out var rem);
+                var (quo2, rem2) = BigInteger.DivRem(left, right);
                 Equal(quo2, quo);
                 Equal(rem2, rem);
             }
@@ -197,38 +209,38 @@ namespace Kzrnm.Numerics.Test
                 var bytes = new byte[rnd.Next(100, 1000)];
                 rnd.NextBytes(bytes);
                 var my = new BigInteger(bytes, isUnsigned: true);
-                var expected = new OrigBigInteger(bytes, isUnsigned: true);
+                OrigBigInteger expected = my;
                 var expectedStr = expected.ToString();
-                my.ToString().Should().Be(expectedStr);
-                (-my).ToString().Should().Be($"-{expectedStr}");
+                my.ToString().ShouldBe(expectedStr);
+                (-my).ToString().ShouldBe($"-{expectedStr}");
             }
             for (int i = 0; i < 50; i++)
             {
                 var bytes = new byte[rnd.Next(100, 1000)];
                 rnd.NextBytes(bytes);
                 var my = new BigInteger(bytes, isUnsigned: false);
-                var expected = new OrigBigInteger(bytes, isUnsigned: false);
+                OrigBigInteger expected = my;
                 var expectedStr = expected.ToString();
-                my.ToString().Should().Be(expectedStr);
+                my.ToString().ShouldBe(expectedStr);
             }
             for (int i = 0; i < 50; i++)
             {
                 var bytes = new byte[rnd.Next(1000, 2000)];
                 rnd.NextBytes(bytes);
                 var my = new BigInteger(bytes, isUnsigned: false);
-                var expected = new OrigBigInteger(bytes, isUnsigned: false);
+                OrigBigInteger expected = my;
                 var expectedStr = expected.ToString();
-                my.ToString().Should().Be(expectedStr);
+                my.ToString().ShouldBe(expectedStr);
             }
             for (int i = 1; i < 50; i++)
             {
                 var bytes = new byte[i];
                 rnd.NextBytes(bytes);
                 var my = new BigInteger(bytes, isUnsigned: true);
-                var expected = new OrigBigInteger(bytes, isUnsigned: true);
+                OrigBigInteger expected = my;
                 var expectedStr = expected.ToString();
-                my.ToString().Should().Be(expectedStr);
-                (-my).ToString().Should().Be($"-{expectedStr}");
+                my.ToString().ShouldBe(expectedStr);
+                (-my).ToString().ShouldBe($"-{expectedStr}");
             }
             for (int i = 0; i < 50; i++)
             {
@@ -236,7 +248,7 @@ namespace Kzrnm.Numerics.Test
                 BigInteger my = num;
                 OrigBigInteger expected = num;
                 var expectedStr = expected.ToString();
-                my.ToString().Should().Be(expectedStr);
+                my.ToString().ShouldBe(expectedStr);
             }
         }
 
@@ -255,7 +267,7 @@ namespace Kzrnm.Numerics.Test
                 OrigBigInteger expected = OrigBigInteger.Parse(s);
                 BigInteger my = new BigInteger(expected.ToByteArray(), isUnsigned: true);
                 var expectedStr = expected.ToString();
-                my.ToString().Should().Be(expectedStr);
+                my.ToString().ShouldBe(expectedStr);
             }
         }
     }
@@ -274,8 +286,8 @@ namespace Kzrnm.Numerics.Test
                     {
                         var s = rnd.GetRandomDigits(rnd.Next(1, 100)) + "1" + new string('0', 8);
                         var num = BigInteger.Parse(s, null);
-                        $"{num}".Should().Be(s);
-                        num.ToString().Should().Be(s);
+                        $"{num}".ShouldBe(s);
+                        num.ToString().ShouldBe(s);
                     }
                 })
             );

@@ -16,7 +16,11 @@ namespace Kzrnm.Numerics.Logic
 
         public static void Pow(uint value, uint power, Span<uint> bits)
         {
+#if NET7_0_OR_GREATER
             Pow(value != 0U ? new ReadOnlySpan<uint>(in value) : default, power, bits);
+#else
+            Pow(value != 0U ? stackalloc uint[1] { value } : default, power, bits);
+#endif
         }
 
         public static void Pow(ReadOnlySpan<uint> value, uint power, Span<uint> bits)
@@ -196,7 +200,11 @@ namespace Kzrnm.Numerics.Logic
         public static void Pow(uint value, uint power,
                                ReadOnlySpan<uint> modulus, Span<uint> bits)
         {
+#if NET7_0_OR_GREATER
             Pow(value != 0U ? new ReadOnlySpan<uint>(in value) : default, power, modulus, bits);
+#else
+            Pow(value != 0U ? stackalloc uint[1] { value } : default, power, modulus, bits);
+#endif
         }
 
         public static void Pow(ReadOnlySpan<uint> value, uint power,
@@ -245,7 +253,11 @@ namespace Kzrnm.Numerics.Logic
         public static void Pow(uint value, ReadOnlySpan<uint> power,
                                ReadOnlySpan<uint> modulus, Span<uint> bits)
         {
+#if NET7_0_OR_GREATER
             Pow(value != 0U ? new ReadOnlySpan<uint>(in value) : default, power, modulus, bits);
+#else
+            Pow(value != 0U ? stackalloc uint[1] { value } : default, power, modulus, bits);
+#endif
         }
 
         public static void Pow(ReadOnlySpan<uint> value, ReadOnlySpan<uint> power,
@@ -291,7 +303,7 @@ namespace Kzrnm.Numerics.Logic
                 ArrayPool<uint>.Shared.Return(tempFromPool);
         }
 
-#if DEBUG
+#if DEBUG && !Embedding
         // Mutable for unit testing...
         internal static
 #else

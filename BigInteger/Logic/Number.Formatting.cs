@@ -11,6 +11,7 @@ using System.Text;
 
 namespace Kzrnm.Numerics.Logic
 {
+    using static SR;
     static partial class Number
     {
         private const int CharStackBufferSize = 32;
@@ -61,7 +62,7 @@ namespace Kzrnm.Numerics.Logic
                 // If the format begins with a symbol, see if it's a standard format
                 // with or without a specified number of digits.
                 c = format[0];
-                if (char.IsAsciiLetter(c))
+                if ((uint)((c | 0x20) - 'a') < 26) // char.IsAsciiLetter(c)
                 {
                     // Fast path for sole symbol, e.g. "D"
                     if (format.Length == 1)
@@ -96,7 +97,8 @@ namespace Kzrnm.Numerics.Logic
                     // digits.  Further, for compat, we need to stop when we hit a null char.
                     int n = 0;
                     int i = 1;
-                    while ((uint)i < (uint)format.Length && char.IsAsciiDigit(format[i]))
+                    while ((uint)i < (uint)format.Length
+                        && (uint)(format[i] - '0') < 10) // char.IsAsciiDigit(format[i])
                     {
                         // Check if we are about to overflow past our limit of 9 digits
                         if (n >= 100_000_000)
@@ -124,22 +126,25 @@ namespace Kzrnm.Numerics.Logic
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static int UInt32ToDecChars<T>(Span<T> buffer, uint value, int digits) where T : unmanaged, IUtfChar<T>
+        internal static int UInt32ToDecChars<T>(Span<T> buffer, uint value, int digits)
         {
             // TODO: Consider to bring optimized implementation from CoreLib
             int i = buffer.Length;
             while (value != 0 || digits > 0)
             {
                 digits--;
-                (value, uint remainder) = Math.DivRem(value, 10);
-                buffer[--i] = T.CastFrom(remainder + '0');
+                var quo = value / 10;
+                var rem = value - quo * 10;
+                value = quo;
+                buffer[--i] = CastFrom<T>(rem + '0');
             }
 
             // return remaining length
             return i;
         }
 
-        internal static void NumberToString<T>(ref ValueListBuilder<T> vlb, ref NumberBuffer number, char format, int nMaxDigits, NumberFormatInfo info) where T : unmanaged, IUtfChar<T>
+        internal static void NumberToString<T>(ref ValueListBuilder<T> vlb, ref NumberBuffer number, char format, int nMaxDigits, NumberFormatInfo info)
+            where T : unmanaged
         {
             Debug.Assert(Unsafe.SizeOf<T>() == sizeof(char) || Unsafe.SizeOf<T>() == sizeof(byte));
 
@@ -288,7 +293,8 @@ namespace Kzrnm.Numerics.Logic
             }
         }
 
-        internal static void NumberToStringFormat<T>(ref ValueListBuilder<T> vlb, ref NumberBuffer number, ReadOnlySpan<char> format, NumberFormatInfo info) where T : unmanaged, IUtfChar<T>
+        internal static void NumberToStringFormat<T>(ref ValueListBuilder<T> vlb, ref NumberBuffer number, ReadOnlySpan<char> format, NumberFormatInfo info)
+            where T : unmanaged
         {
             Debug.Assert(Unsafe.SizeOf<T>() == sizeof(char) || Unsafe.SizeOf<T>() == sizeof(byte));
 
@@ -536,7 +542,7 @@ namespace Kzrnm.Numerics.Logic
                             {
                                 // digPos will be one greater than thousandsSepPos[thousandsSepCtr] since we are at
                                 // the character after which the groupSeparator needs to be appended.
-                                vlb.Append(T.CastFrom(Unsafe.Add(ref dig, cur) != 0 ? Unsafe.Add(ref dig, cur++) : '0'));
+                                vlb.Append(CastFrom<T>(Unsafe.Add(ref dig, cur) != 0 ? Unsafe.Add(ref dig, cur++) : '0'));
                                 if (thousandSeps && digPos > 1 && thousandsSepCtr >= 0)
                                 {
                                     if (digPos == thousandsSepPos[thousandsSepCtr] + 1)
@@ -569,7 +575,7 @@ namespace Kzrnm.Numerics.Logic
 
                             if (ch != 0)
                             {
-                                vlb.Append(T.CastFrom(ch));
+                                vlb.Append(CastFrom<T>(ch));
                                 if (thousandSeps && digPos > 1 && thousandsSepCtr >= 0)
                                 {
                                     if (digPos == thousandsSepPos[thousandsSepCtr] + 1)
@@ -656,7 +662,7 @@ namespace Kzrnm.Numerics.Logic
                                 }
                                 else
                                 {
-                                    vlb.Append(T.CastFrom(ch));
+                                    vlb.Append(CastFrom<T>(ch));
                                     break;
                                 }
 
@@ -676,7 +682,7 @@ namespace Kzrnm.Numerics.Logic
                             }
                             else
                             {
-                                vlb.Append(T.CastFrom(ch));
+                                vlb.Append(CastFrom<T>(ch));
                                 if (src < format.Length)
                                 {
                                     if (format[src] == '+' || format[src] == '-')
@@ -705,7 +711,8 @@ namespace Kzrnm.Numerics.Logic
             }
         }
 
-        private static void FormatCurrency<T>(ref ValueListBuilder<T> vlb, ref NumberBuffer number, int nMaxDigits, NumberFormatInfo info) where T : unmanaged, IUtfChar<T>
+        private static void FormatCurrency<T>(ref ValueListBuilder<T> vlb, ref NumberBuffer number, int nMaxDigits, NumberFormatInfo info)
+            where T : unmanaged
         {
             Debug.Assert(Unsafe.SizeOf<T>() == sizeof(char) || Unsafe.SizeOf<T>() == sizeof(byte));
 
@@ -730,7 +737,7 @@ namespace Kzrnm.Numerics.Logic
                         break;
 
                     default:
-                        vlb.Append(T.CastFrom(ch));
+                        vlb.Append(CastFrom<T>(ch));
                         break;
                 }
             }
@@ -739,7 +746,7 @@ namespace Kzrnm.Numerics.Logic
         private static void FormatFixed<T>(
             ref ValueListBuilder<T> vlb, ref NumberBuffer number,
             int nMaxDigits, int[]? groupDigits,
-            ReadOnlySpan<T> sDecimal, ReadOnlySpan<T> sGroup) where T : unmanaged, IUtfChar<T>
+            ReadOnlySpan<T> sDecimal, ReadOnlySpan<T> sGroup)
         {
             Debug.Assert(Unsafe.SizeOf<T>() == sizeof(char) || Unsafe.SizeOf<T>() == sizeof(byte));
 
@@ -791,7 +798,7 @@ namespace Kzrnm.Numerics.Logic
                     int ps = bufferSize - 1;
                     for (int i = digPos - 1; i >= 0; i--)
                     {
-                        Unsafe.Add(ref spanPtr, ps--) = T.CastFrom((i < digStart) ? (char)Unsafe.Add(ref dig, ix + i) : '0');
+                        Unsafe.Add(ref spanPtr, ps--) = CastFrom<T>((i < digStart) ? (char)Unsafe.Add(ref dig, ix + i) : '0');
 
                         if (groupSize > 0)
                         {
@@ -820,14 +827,14 @@ namespace Kzrnm.Numerics.Logic
                 {
                     do
                     {
-                        vlb.Append(T.CastFrom(Unsafe.Add(ref dig, ix) != 0 ? Unsafe.Add(ref dig, ix++) : '0'));
+                        vlb.Append(CastFrom<T>(Unsafe.Add(ref dig, ix) != 0 ? Unsafe.Add(ref dig, ix++) : '0'));
                     }
                     while (--digPos > 0);
                 }
             }
             else
             {
-                vlb.Append(T.CastFrom('0'));
+                vlb.Append(CastFrom<T>('0'));
             }
 
             if (nMaxDigits > 0)
@@ -838,7 +845,7 @@ namespace Kzrnm.Numerics.Logic
                     int zeroes = Math.Min(-digPos, nMaxDigits);
                     for (int i = 0; i < zeroes; i++)
                     {
-                        vlb.Append(T.CastFrom('0'));
+                        vlb.Append(CastFrom<T>('0'));
                     }
                     digPos += zeroes;
                     nMaxDigits -= zeroes;
@@ -846,7 +853,7 @@ namespace Kzrnm.Numerics.Logic
 
                 while (nMaxDigits > 0)
                 {
-                    vlb.Append(T.CastFrom(Unsafe.Add(ref dig, ix) != 0 ? Unsafe.Add(ref dig, ix++) : '0'));
+                    vlb.Append(CastFrom<T>(Unsafe.Add(ref dig, ix) != 0 ? Unsafe.Add(ref dig, ix++) : '0'));
                     nMaxDigits--;
                 }
             }
@@ -855,13 +862,14 @@ namespace Kzrnm.Numerics.Logic
         /// <summary>Appends a char to the builder when the char is not known to be ASCII.</summary>
         /// <remarks>This requires a helper as if the character isn't ASCII, for UTF-8 encoding it will result in multiple bytes added.</remarks>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static void AppendUnknownChar<T>(ref ValueListBuilder<T> vlb, char ch) where T : unmanaged, IUtfChar<T>
+        private static void AppendUnknownChar<T>(ref ValueListBuilder<T> vlb, char ch)
+            where T : unmanaged
         {
             Debug.Assert(Unsafe.SizeOf<T>() == sizeof(char) || Unsafe.SizeOf<T>() == sizeof(byte));
 
-            if (Unsafe.SizeOf<T>() == sizeof(char) || char.IsAscii(ch))
+            if (Unsafe.SizeOf<T>() == sizeof(char) || (uint)ch <= '\x007f')
             {
-                vlb.Append(T.CastFrom(ch));
+                vlb.Append(CastFrom<T>(ch));
             }
             else
             {
@@ -871,12 +879,19 @@ namespace Kzrnm.Numerics.Logic
             [MethodImpl(MethodImplOptions.NoInlining)]
             static void AppendNonAsciiBytes(ref ValueListBuilder<T> vlb, char ch)
             {
+#if NET7_0_OR_GREATER
                 var r = new Rune(ch);
                 r.EncodeToUtf8(MemoryMarshal.AsBytes(vlb.AppendSpan(r.Utf8SequenceLength)));
+#else
+                var bytes = Encoding.UTF8.GetBytes($"{ch}").AsSpan();
+                bytes.CopyTo(MemoryMarshal.AsBytes(vlb.AppendSpan(bytes.Length)));
+
+#endif
             }
         }
 
-        private static void FormatNumber<T>(ref ValueListBuilder<T> vlb, ref NumberBuffer number, int nMaxDigits, NumberFormatInfo info) where T : unmanaged, IUtfChar<T>
+        private static void FormatNumber<T>(ref ValueListBuilder<T> vlb, ref NumberBuffer number, int nMaxDigits, NumberFormatInfo info)
+            where T : unmanaged
         {
             Debug.Assert(Unsafe.SizeOf<T>() == sizeof(char) || Unsafe.SizeOf<T>() == sizeof(byte));
 
@@ -897,13 +912,14 @@ namespace Kzrnm.Numerics.Logic
                         break;
 
                     default:
-                        vlb.Append(T.CastFrom(ch));
+                        vlb.Append(CastFrom<T>(ch));
                         break;
                 }
             }
         }
 
-        private static void FormatScientific<T>(ref ValueListBuilder<T> vlb, ref NumberBuffer number, int nMaxDigits, NumberFormatInfo info, char expChar) where T : unmanaged, IUtfChar<T>
+        private static void FormatScientific<T>(ref ValueListBuilder<T> vlb, ref NumberBuffer number, int nMaxDigits, NumberFormatInfo info, char expChar)
+            where T : unmanaged
         {
             Debug.Assert(Unsafe.SizeOf<T>() == sizeof(char) || Unsafe.SizeOf<T>() == sizeof(byte));
 
@@ -911,7 +927,7 @@ namespace Kzrnm.Numerics.Logic
             ref var dig = ref MemoryMarshal.GetReference(number.Digits);
             int ix = 0;
 
-            vlb.Append(T.CastFrom(Unsafe.Add(ref dig, ix) != 0 ? Unsafe.Add(ref dig, ix++) : '0'));
+            vlb.Append(CastFrom<T>(Unsafe.Add(ref dig, ix) != 0 ? Unsafe.Add(ref dig, ix++) : '0'));
 
             if (nMaxDigits != 1) // For E0 we would like to suppress the decimal point
             {
@@ -920,18 +936,19 @@ namespace Kzrnm.Numerics.Logic
 
             while (--nMaxDigits > 0)
             {
-                vlb.Append(T.CastFrom(Unsafe.Add(ref dig, ix) != 0 ? Unsafe.Add(ref dig, ix++) : '0'));
+                vlb.Append(CastFrom<T>(Unsafe.Add(ref dig, ix) != 0 ? Unsafe.Add(ref dig, ix++) : '0'));
             }
 
             int e = number.Digits[0] == 0 ? 0 : number.Scale - 1;
             FormatExponent(ref vlb, info, e, expChar, 3, true);
         }
 
-        private static void FormatExponent<T>(ref ValueListBuilder<T> vlb, NumberFormatInfo info, int value, char expChar, int minDigits, bool positiveSign) where T : unmanaged, IUtfChar<T>
+        private static void FormatExponent<T>(ref ValueListBuilder<T> vlb, NumberFormatInfo info, int value, char expChar, int minDigits, bool positiveSign)
+            where T : unmanaged
         {
             Debug.Assert(Unsafe.SizeOf<T>() == sizeof(char) || Unsafe.SizeOf<T>() == sizeof(byte));
 
-            vlb.Append(T.CastFrom(expChar));
+            vlb.Append(CastFrom<T>(expChar));
 
             if (value < 0)
             {
@@ -951,7 +968,8 @@ namespace Kzrnm.Numerics.Logic
             vlb.Append(digits.Slice(0, len));
         }
 
-        private static void FormatGeneral<T>(ref ValueListBuilder<T> vlb, ref NumberBuffer number, int nMaxDigits, NumberFormatInfo info, char expChar, bool suppressScientific) where T : unmanaged, IUtfChar<T>
+        private static void FormatGeneral<T>(ref ValueListBuilder<T> vlb, ref NumberBuffer number, int nMaxDigits, NumberFormatInfo info, char expChar, bool suppressScientific)
+            where T : unmanaged
         {
             Debug.Assert(Unsafe.SizeOf<T>() == sizeof(char) || Unsafe.SizeOf<T>() == sizeof(byte));
 
@@ -976,13 +994,13 @@ namespace Kzrnm.Numerics.Logic
             {
                 do
                 {
-                    vlb.Append(T.CastFrom(Unsafe.Add(ref dig, ix) != 0 ? Unsafe.Add(ref dig, ix++) : '0'));
+                    vlb.Append(CastFrom<T>(Unsafe.Add(ref dig, ix) != 0 ? Unsafe.Add(ref dig, ix++) : '0'));
                 }
                 while (--digPos > 0);
             }
             else
             {
-                vlb.Append(T.CastFrom('0'));
+                vlb.Append(CastFrom<T>('0'));
             }
 
             if (Unsafe.Add(ref dig, ix) != 0 || digPos < 0)
@@ -991,13 +1009,13 @@ namespace Kzrnm.Numerics.Logic
 
                 while (digPos < 0)
                 {
-                    vlb.Append(T.CastFrom('0'));
+                    vlb.Append(CastFrom<T>('0'));
                     digPos++;
                 }
 
                 while (Unsafe.Add(ref dig, ix) != 0)
                 {
-                    vlb.Append(T.CastFrom(Unsafe.Add(ref dig, ix++)));
+                    vlb.Append(CastFrom<T>(Unsafe.Add(ref dig, ix++)));
                 }
             }
 
@@ -1007,7 +1025,8 @@ namespace Kzrnm.Numerics.Logic
             }
         }
 
-        private static void FormatPercent<T>(ref ValueListBuilder<T> vlb, ref NumberBuffer number, int nMaxDigits, NumberFormatInfo info) where T : unmanaged, IUtfChar<T>
+        private static void FormatPercent<T>(ref ValueListBuilder<T> vlb, ref NumberBuffer number, int nMaxDigits, NumberFormatInfo info)
+            where T : unmanaged
         {
             Debug.Assert(Unsafe.SizeOf<T>() == sizeof(char) || Unsafe.SizeOf<T>() == sizeof(byte));
 
@@ -1032,7 +1051,7 @@ namespace Kzrnm.Numerics.Logic
                         break;
 
                     default:
-                        vlb.Append(T.CastFrom(ch));
+                        vlb.Append(CastFrom<T>(ch));
                         break;
                 }
             }

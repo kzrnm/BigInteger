@@ -1,10 +1,20 @@
-﻿using System.Numerics;
 using System.Reflection;
 
 namespace Kzrnm.Numerics.Test
 {
-    public abstract class BigIntegerTestsBase<T> where T : IParsable<T>, INumber<T>
+    public abstract class BigIntegerTestsBase<T> where T : struct
     {
+        static Func<string, IFormatProvider?, T> ParseDelegate
+            = (Func<string, IFormatProvider?, T>)typeof(T).GetMethod("Parse", BindingFlags.Static | BindingFlags.Public, binder: null, [typeof(string), typeof(IFormatProvider)], modifiers: null)!
+            .CreateDelegate(typeof(Func<string, IFormatProvider?, T>));
+
+        static Func<T, T, (T, T)> DivRemDelegate
+            = (Func<T, T, (T, T)>)typeof(T).GetMethod("DivRem", BindingFlags.Static | BindingFlags.Public, binder: null, [typeof(T), typeof(T)], modifiers: null)!
+            .CreateDelegate(typeof(Func<T, T, (T, T)>));
+
+        static dynamic Parse(string s, IFormatProvider? provider)
+            => ParseDelegate.Invoke(s, provider)!;
+
         public record BigIntegerData(string Left, string Right)
         {
             public OrigBigInteger OrigLeft { get; } = OrigBigInteger.Parse(Left);
@@ -31,10 +41,13 @@ namespace Kzrnm.Numerics.Test
                 $"{long.MaxValue}",
                 $"{long.MaxValue+1UL}",
                 $"{ulong.MaxValue}",
-                $"{new UInt128(1,0)}",
-                $"{Int128.MaxValue}",
-                $"{(UInt128)Int128.MaxValue + 1}",
-                $"{1+(OrigBigInteger)UInt128.MaxValue}",
+                $"{OrigBigInteger.One<<64}",
+                $"{(OrigBigInteger.One<<127)-1}",
+                $"{OrigBigInteger.One<<127}",
+                $"{(OrigBigInteger.One<<127)+1}",
+                $"{(OrigBigInteger.One<<128)-1}",
+                $"{OrigBigInteger.One<<128}",
+                $"{(OrigBigInteger.One<<128)+1}",
             };
 
             foreach (var sign1 in new[] { "", "+", "-" })
@@ -117,8 +130,8 @@ namespace Kzrnm.Numerics.Test
         {
             foreach (var data in Values())
             {
-                Equal(T.Parse(data.Left, null) + T.Parse(data.Right, null), data.OrigLeft + data.OrigRight);
-                Equal(-T.Parse(data.Left, null) + -T.Parse(data.Right, null), -data.OrigLeft + -data.OrigRight);
+                Equal(Parse(data.Left, null) + Parse(data.Right, null), data.OrigLeft + data.OrigRight);
+                Equal(-Parse(data.Left, null) + -Parse(data.Right, null), -data.OrigLeft + -data.OrigRight);
             }
         }
 
@@ -127,8 +140,8 @@ namespace Kzrnm.Numerics.Test
         {
             foreach (var data in Values())
             {
-                Equal(T.Parse(data.Left, null) - T.Parse(data.Right, null), data.OrigLeft - data.OrigRight);
-                Equal(-T.Parse(data.Left, null) - -T.Parse(data.Right, null), -data.OrigLeft - -data.OrigRight);
+                Equal(Parse(data.Left, null) - Parse(data.Right, null), data.OrigLeft - data.OrigRight);
+                Equal(-Parse(data.Left, null) - -Parse(data.Right, null), -data.OrigLeft - -data.OrigRight);
             }
         }
 
@@ -137,24 +150,23 @@ namespace Kzrnm.Numerics.Test
         {
             foreach (var data in Values().Concat(MultiplyValues()))
             {
-                Equal(T.Parse(data.Left, null) * T.Parse(data.Right, null), data.OrigLeft * data.OrigRight);
-                Equal(T.Parse(data.Left, null) * -T.Parse(data.Right, null), data.OrigLeft * -data.OrigRight);
-                Equal(-T.Parse(data.Left, null) * -T.Parse(data.Right, null), -data.OrigLeft * -data.OrigRight);
+                Equal(Parse(data.Left, null) * Parse(data.Right, null), data.OrigLeft * data.OrigRight);
+                Equal(Parse(data.Left, null) * -Parse(data.Right, null), data.OrigLeft * -data.OrigRight);
+                Equal(-Parse(data.Left, null) * -Parse(data.Right, null), -data.OrigLeft * -data.OrigRight);
             }
         }
 
         [Fact]
         public void DivRem()
         {
-            var divRemMethod = typeof(T).GetMethod("DivRem", BindingFlags.Public | BindingFlags.Static, [typeof(T), typeof(T)]);
             foreach (var data in Values().Concat(DivValues()))
             {
-                var (quo, rem) = OrigBigInteger.DivRem(data.OrigLeft, data.OrigRight);
+                var quo = OrigBigInteger.DivRem(data.OrigLeft, data.OrigRight, out var rem);
 
-                var ss = T.Parse(data.Left, null);
-                var tt = T.Parse(data.Right, null);
+                var ss = Parse(data.Left, null);
+                var tt = Parse(data.Right, null);
 
-                var (quo2, rem2) = ((T, T))divRemMethod?.Invoke(null, [ss, tt])!;
+                var (quo2, rem2) = ((T, T))DivRemDelegate.Invoke(ss, tt)!;
                 Equal(quo2, quo);
                 Equal(rem2, rem);
 
@@ -168,32 +180,26 @@ namespace Kzrnm.Numerics.Test
         {
             {
                 var s = "9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999";
-                var num = T.Parse(s, null);
-                $"{num}".Should().Be(s);
-                num.ToString().Should().Be(s);
-            }
-            {
-                var s = "9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999";
-                var num = T.Parse(s, null);
-                $"{num}".Should().Be(s);
-                num.ToString().Should().Be(s);
+                var num = (T)Parse(s, null);
+                $"{num}".ShouldBe(s);
+                num.ToString().ShouldBe(s);
             }
             {
                 var s = "-1111111111111111111111111111111111111111";
-                var num = T.Parse(s, null);
-                num.ToString().Should().Be(s);
+                var num = (T)Parse(s, null);
+                num.ToString().ShouldBe(s);
             }
             for (int i = 1; i < 1000; i++)
             {
                 var s = new string('9', i);
-                var num = T.Parse(s, null);
-                $"{num}".Should().Be(s);
-                num.ToString().Should().Be(s);
+                var num = (T)Parse(s, null);
+                $"{num}".ShouldBe(s);
+                num.ToString().ShouldBe(s);
 
-                var t = $"-{s}";
-                num = T.Parse(s, null);
-                $"{T.Parse(t, null)}".Should().Be(t);
-                num.ToString().Should().Be(s);
+                s = $"-{s}";
+                num = (T)Parse(s, null);
+                $"{num}".ShouldBe(s);
+                num.ToString().ShouldBe(s);
             }
         }
 
@@ -245,13 +251,13 @@ namespace Kzrnm.Numerics.Test
 
             void Test(string s)
             {
-                var my = T.Parse(s, null);
+                var my = Parse(s, null);
                 var orig = OrigBigInteger.Parse(s);
                 Equal(my, orig);
             }
         }
 
-        static IEnumerable<Int128> PlusMinus(Int128 v) => [v - 1, v, v + 1];
+        static IEnumerable<OrigBigInteger> PlusMinus(OrigBigInteger v) => [v - 1, v, v + 1];
 
         public static void Equal(T actual, OrigBigInteger expected)
         {
@@ -264,10 +270,10 @@ namespace Kzrnm.Numerics.Test
                 if (bytesObj is byte[] bytes)
                 {
                     var expectedBytes = expected.ToByteArray();
-                    bytes.Should().Equal(expectedBytes);
+                    bytes.ShouldBe(expectedBytes);
                 }
 #endif
-                actual.ToString().Should().Be(expected.ToString());
+                actual.ToString().ShouldBe(expected.ToString());
             }
         }
     }

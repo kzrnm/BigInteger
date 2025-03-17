@@ -22,6 +22,7 @@ public class BenchmarkConfig : ManualConfig
     {
         //AddDiagnoser(MemoryDiagnoser.Default);
         AddExporter(BenchmarkDotNet.Exporters.MarkdownExporter.GitHub);
+        AddJob(Job.ShortRun.WithToolchain(CsProjClassicNetToolchain.Net481));
         AddJob(Job.ShortRun.WithToolchain(CsProjCoreToolchain.NetCoreApp70));
         AddJob(Job.ShortRun.WithToolchain(CsProjCoreToolchain.NetCoreApp90));
 
@@ -81,8 +82,8 @@ public class BigIntegerToString
     {
         var bytes = new byte[N];
         rnd.NextBytes(bytes);
-        orig = new(bytes, isUnsigned: true);
         my = new(bytes, isUnsigned: true);
+        orig = my;
     }
 
     [Benchmark(Baseline = true)]
@@ -110,10 +111,10 @@ public class BigIntegerAdd
         var bytes2 = new byte[N / 2];
         rnd.NextBytes(bytes1);
         rnd.NextBytes(bytes2);
-        orig1 = new(bytes1, isUnsigned: true);
-        orig2 = new(bytes2, isUnsigned: true);
         my1 = new(bytes1, isUnsigned: true);
         my2 = new(bytes2, isUnsigned: true);
+        orig1 = my1;
+        orig2 = my2;
     }
 
     [Benchmark(Baseline = true)] public OrigBigInteger Orig() => orig1 + orig2;
@@ -140,10 +141,10 @@ public class BigIntegerMultiply
         var bytes2 = new byte[N / 2];
         rnd.NextBytes(bytes1);
         rnd.NextBytes(bytes2);
-        orig1 = new(bytes1, isUnsigned: true);
-        orig2 = new(bytes2, isUnsigned: true);
         my1 = new(bytes1, isUnsigned: true);
         my2 = new(bytes2, isUnsigned: true);
+        orig1 = my1;
+        orig2 = my2;
     }
 
     [Benchmark(Baseline = true)] public OrigBigInteger Orig() => orig1 * orig2;
@@ -170,10 +171,10 @@ public class BigIntegerDivide
         var bytes2 = new byte[N / 2];
         rnd.NextBytes(bytes1);
         rnd.NextBytes(bytes2);
-        orig1 = new(bytes1, isUnsigned: true);
-        orig2 = new(bytes2, isUnsigned: true);
         my1 = new(bytes1, isUnsigned: true);
         my2 = new(bytes2, isUnsigned: true);
+        orig1 = my1;
+        orig2 = my2;
     }
 
     [Benchmark(Baseline = true)] public OrigBigInteger Orig() => orig1 / orig2;

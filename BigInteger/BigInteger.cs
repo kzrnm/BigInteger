@@ -16,11 +16,13 @@ namespace Kzrnm.Numerics
     [DebuggerDisplay("{DebuggerDisplay,nq}")]
     public struct BigInteger
         : IComparable,
-          IComparable<BigInteger>,
-          IEquatable<BigInteger>,
+#if NET7_0_OR_GREATER
           ISpanFormattable,
           IBinaryInteger<BigInteger>,
-          ISignedNumber<BigInteger>
+          ISignedNumber<BigInteger>,
+#endif
+          IComparable<BigInteger>,
+          IEquatable<BigInteger>
     {
         /*
          * Original is System.Numerics.BigInteger
@@ -36,7 +38,6 @@ Copyright (c) .NET Foundation and Contributors
 Released under the MIT license
 https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
 ";
-
         internal const uint kuMaskHighBit = unchecked((uint)int.MinValue);
         internal const int kcbitUint = 32;
         internal const int kcbitUlong = 64;
@@ -49,7 +50,13 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
         // Such a value allows for almost 646,456,974 digits, which is more than large enough
         // for typical scenarios. If user code requires more than this, they should likely
         // roll their own type that utilizes native memory and other specialized techniques.
-        internal static int MaxLength => Array.MaxLength / kcbitUint;
+        internal static int MaxLength =>
+#if NET7_0_OR_GREATER
+            Array.MaxLength
+#else
+            0X7FFFFFC7
+#endif
+            / kcbitUint;
 
         // For values int.MinValue < n <= int.MaxValue, the value is stored in sign
         // and _bits is null. For all other values, sign is +1 or -1 and the bits are in _bits
@@ -163,6 +170,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
 
         public BigInteger(double value)
         {
+#if NET7_0_OR_GREATER
             if (!double.IsFinite(value))
             {
                 if (double.IsInfinity(value))
@@ -174,6 +182,16 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
                     throw new OverflowException(SR.Overflow_NotANumber);
                 }
             }
+#else
+            if (double.IsInfinity(value))
+            {
+                throw new OverflowException(SR.Overflow_BigIntInfinity);
+            }
+            else if (double.IsNaN(value)) // NaN
+            {
+                throw new OverflowException(SR.Overflow_NotANumber);
+            }
+#endif
 
             _sign = 0;
             _bits = null;
@@ -237,8 +255,12 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
         public BigInteger(decimal value)
         {
             // First truncate to get scale to 0 and extract bits
+#if NET7_0_OR_GREATER
             Span<int> bits = stackalloc int[4];
             decimal.GetBits(decimal.Truncate(value), bits);
+#else
+            Span<int> bits = decimal.GetBits(decimal.Truncate(value));
+#endif
 
             Debug.Assert(bits.Length == 4 && (bits[3] & DecimalScaleFactorMask) == 0);
 
@@ -664,6 +686,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             {
                 AssertValid();
 
+#if NET7_0_OR_GREATER
                 if (_bits == null)
                     return BitOperations.IsPow2(_sign);
 
@@ -673,6 +696,18 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
                 int iu = _bits.Length - 1;
 
                 return BitOperations.IsPow2(_bits[iu]) && !_bits.AsSpan(0, iu).ContainsAnyExcept(0u);
+#else
+                if (_sign <= 0)
+                    return false;
+
+                if (_bits == null)
+                    return IsPow2((uint)_sign);
+
+                int iu = _bits.Length - 1;
+
+                return IsPow2(_bits[iu]) && !_bits.AsSpan(0, iu).ContainsAnyExcept(0u);
+                static bool IsPow2(uint v) => (v & (v - 1)) == 0 && v != 0;
+#endif
             }
         }
 
@@ -704,7 +739,11 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
 
         public static BigInteger Parse(string value, NumberStyles style, IFormatProvider? provider)
         {
+#if NET7_0_OR_GREATER
             ArgumentNullException.ThrowIfNull(value);
+#else
+            ThrowHelper.ThrowIfNull(value);
+#endif
             return Parse(value.AsSpan(), style, NumberFormatInfo.GetInstance(provider));
         }
 
@@ -779,7 +818,8 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             if (trivialDividend && trivialDivisor)
             {
                 BigInteger quotient;
-                (quotient, remainder) = Math.DivRem(dividend._sign, divisor._sign);
+                quotient = Math.DivRem(dividend._sign, divisor._sign, out var r32);
+                remainder = r32;
                 return quotient;
             }
 
@@ -880,7 +920,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             ulong l = value._bits.Length > 2 ? value._bits[value._bits.Length - 3] : 0;
 
             // Measure the exact bit count
-            int c = BitOperations.LeadingZeroCount((uint)h);
+            int c = NumericsHelpers.LeadingZeroCount((uint)h);
             long b = (long)value._bits.Length * 32 - c;
 
             // Extract most significant bits
@@ -1114,7 +1154,12 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
                 return _sign;
 
             HashCode hash = default;
+#if NET7_0_OR_GREATER
             hash.AddBytes(MemoryMarshal.AsBytes(_bits.AsSpan()));
+#else
+            foreach (var v in _bits.AsSpan())
+                hash.Add(v);
+#endif
             hash.Add(_sign);
             return hash.ToHashCode();
         }
@@ -1659,11 +1704,6 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             }
         }
 
-        public bool TryFormat(Span<char> destination, out int charsWritten, [StringSyntax(StringSyntaxAttribute.NumericFormat)] ReadOnlySpan<char> format = default, IFormatProvider? provider = null)
-        {
-            return Number.TryFormatBigInteger(this, format, NumberFormatInfo.GetInstance(provider), destination, out charsWritten);
-        }
-
         private static BigInteger Add(ReadOnlySpan<uint> leftBits, int leftSign, ReadOnlySpan<uint> rightBits, int rightSign)
         {
             bool trivialLeft = leftBits.IsEmpty;
@@ -1872,7 +1912,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             ulong m = length > 1 ? bits[length - 2] : 0;
             ulong l = length > 2 ? bits[length - 3] : 0;
 
-            int z = BitOperations.LeadingZeroCount((uint)h);
+            int z = NumericsHelpers.LeadingZeroCount((uint)h);
 
             int exp = (length - 2) * 32 - z;
             ulong man = (h << 32 + z) | (m << z) | (l >> 32 - z);
@@ -1880,6 +1920,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             return NumericsHelpers.GetDoubleFromParts(sign, exp, man);
         }
 
+#if NET7_0_OR_GREATER
         /// <summary>Explicitly converts a big integer to a <see cref="Half" /> value.</summary>
         /// <param name="value">The value to convert.</param>
         /// <returns><paramref name="value" /> converted to <see cref="Half" /> value.</returns>
@@ -1887,6 +1928,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
         {
             return (Half)(double)value;
         }
+#endif
 
         public static explicit operator short(BigInteger value)
         {
@@ -1950,6 +1992,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             throw new OverflowException(SR.Overflow_Int64);
         }
 
+#if NET7_0_OR_GREATER
         /// <summary>Explicitly converts a big integer to a <see cref="Int128" /> value.</summary>
         /// <param name="value">The value to convert.</param>
         /// <returns><paramref name="value" /> converted to <see cref="Int128" /> value.</returns>
@@ -2011,6 +2054,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
                 return (int)value;
             }
         }
+#endif
 
         public static explicit operator sbyte(BigInteger value)
         {
@@ -2065,6 +2109,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             return value._bits[0];
         }
 
+#if NET7_0_OR_GREATER
         /// <summary>Explicitly converts a big integer to a <see cref="UInt128" /> value.</summary>
         /// <param name="value">The value to convert.</param>
         /// <returns><paramref name="value" /> converted to <see cref="UInt128" /> value.</returns>
@@ -2112,6 +2157,15 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
                 return (uint)value;
             }
         }
+#endif
+        /// <summary>Explicitly converts a big integer to a <see cref="System.Numerics.BigInteger" /> value.</summary>
+        /// <param name="value">The value to convert.</param>
+        /// <returns><paramref name="value" /> converted to <see cref="System.Numerics.BigInteger" /> value.</returns>
+        public static implicit operator System.Numerics.BigInteger(BigInteger value)
+        {
+            var bytes = value.ToByteArray();
+            return new System.Numerics.BigInteger(bytes);
+        }
 
         //
         // Explicit Conversions To BigInteger
@@ -2127,6 +2181,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             return new BigInteger(value);
         }
 
+#if NET7_0_OR_GREATER
         /// <summary>Explicitly converts a <see cref="Half" /> value to a big integer.</summary>
         /// <param name="value">The value to convert.</param>
         /// <returns><paramref name="value" /> converted to a big integer.</returns>
@@ -2146,6 +2201,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             }
             return (BigInteger)value.Real;
         }
+#endif
 
         public static explicit operator BigInteger(float value)
         {
@@ -2183,7 +2239,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
         {
             return new BigInteger(value);
         }
-
+#if NET7_0_OR_GREATER
         /// <summary>Implicitly converts a <see cref="Int128" /> value to a big integer.</summary>
         /// <param name="value">The value to convert.</param>
         /// <returns><paramref name="value" /> converted to a big integer.</returns>
@@ -2260,6 +2316,12 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
                 return new BigInteger((int)value);
             }
         }
+#endif
+        public static implicit operator BigInteger(System.Numerics.BigInteger value)
+        {
+            var bytes = value.ToByteArray();
+            return new BigInteger(bytes);
+        }
 
         public static implicit operator BigInteger(sbyte value)
         {
@@ -2281,6 +2343,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             return new BigInteger(value);
         }
 
+#if NET7_0_OR_GREATER
         /// <summary>Implicitly converts a <see cref="UInt128" /> value to a big integer.</summary>
         /// <param name="value">The value to convert.</param>
         /// <returns><paramref name="value" /> converted to a big integer.</returns>
@@ -2338,6 +2401,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
                 return new BigInteger((uint)value);
             }
         }
+#endif
 
         public static BigInteger operator &(BigInteger left, BigInteger right)
         {
@@ -2513,7 +2577,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             if (shift < 0)
                 return value >> -shift;
 
-            (int digitShift, int smallShift) = Math.DivRem(shift, kcbitUint);
+            int digitShift = Math.DivRem(shift, kcbitUint, out int smallShift);
 
             if (value._bits is null)
                 return LeftShift(value._sign, digitShift, smallShift);
@@ -2595,7 +2659,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             if (shift < 0)
                 return value << -shift;
 
-            (int digitShift, int smallShift) = Math.DivRem(shift, kcbitUint);
+            int digitShift = Math.DivRem(shift, kcbitUint, out int smallShift);
 
             if (value._bits is null)
             {
@@ -2994,7 +3058,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
                 highValue = bits[bitsArrayLength - 1];
             }
 
-            long bitLength = bitsArrayLength * 32L - BitOperations.LeadingZeroCount(highValue);
+            long bitLength = bitsArrayLength * 32L - NumericsHelpers.LeadingZeroCount(highValue);
 
             if (sign >= 0)
                 return bitLength;
@@ -3041,6 +3105,14 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             }
         }
 
+        /// <inheritdoc cref="IBinaryInteger{TSelf}.DivRem(TSelf, TSelf)" />
+        public static (BigInteger Quotient, BigInteger Remainder) DivRem(BigInteger left, BigInteger right)
+        {
+            BigInteger quotient = DivRem(left, right, out BigInteger remainder);
+            return (quotient, remainder);
+        }
+
+#if NET7_0_OR_GREATER
         //
         // IAdditiveIdentity
         //
@@ -3051,13 +3123,6 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
         //
         // IBinaryInteger
         //
-
-        /// <inheritdoc cref="IBinaryInteger{TSelf}.DivRem(TSelf, TSelf)" />
-        public static (BigInteger Quotient, BigInteger Remainder) DivRem(BigInteger left, BigInteger right)
-        {
-            BigInteger quotient = DivRem(left, right, out BigInteger remainder);
-            return (quotient, remainder);
-        }
 
         /// <inheritdoc cref="IBinaryInteger{TSelf}.LeadingZeroCount(TSelf)" />
         public static BigInteger LeadingZeroCount(BigInteger value)
@@ -3183,11 +3248,11 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
 
                 if (value >= 0)
                 {
-                    return (sizeof(int) * 8) - BitOperations.LeadingZeroCount((uint)(value));
+                    return (sizeof(int) * 8) - NumericsHelpers.LeadingZeroCount((uint)(value));
                 }
                 else
                 {
-                    return (sizeof(int) * 8) + 1 - BitOperations.LeadingZeroCount((uint)(~value));
+                    return (sizeof(int) * 8) + 1 - NumericsHelpers.LeadingZeroCount((uint)(~value));
                 }
             }
 
@@ -3195,7 +3260,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
 
             if (_sign >= 0)
             {
-                result += (sizeof(uint) * 8) - BitOperations.LeadingZeroCount(bits[^1]);
+                result += (sizeof(uint) * 8) - NumericsHelpers.LeadingZeroCount(bits[^1]);
             }
             else
             {
@@ -3214,7 +3279,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
                     }
                 }
 
-                result += (sizeof(uint) * 8) + 1 - BitOperations.LeadingZeroCount(~part);
+                result += (sizeof(uint) * 8) + 1 - NumericsHelpers.LeadingZeroCount(~part);
             }
 
             return result;
@@ -3500,6 +3565,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
 
         /// <inheritdoc cref="IMultiplicativeIdentity{TSelf, TResult}.MultiplicativeIdentity" />
         static BigInteger IMultiplicativeIdentity<BigInteger, BigInteger>.MultiplicativeIdentity => One;
+#endif
 
         //
         // INumber
@@ -3558,7 +3624,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
 
             return (currentSign == targetSign) ? value : -value;
         }
-
+#if NET7_0_OR_GREATER
         /// <inheritdoc cref="INumber{TSelf}.MaxNumber(TSelf, TSelf)" />
         static BigInteger INumber<BigInteger>.MaxNumber(BigInteger x, BigInteger y) => Max(x, y);
 
@@ -3883,6 +3949,12 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
                 result = actualValue;
                 return true;
             }
+            else if (typeof(TOther) == typeof(System.Numerics.BigInteger))
+            {
+                System.Numerics.BigInteger actualValue = (System.Numerics.BigInteger)(object)value;
+                result = actualValue;
+                return true;
+            }
             else
             {
                 result = default;
@@ -3997,6 +4069,12 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             else if (typeof(TOther) == typeof(nuint))
             {
                 nuint actualValue = (nuint)(object)value;
+                result = actualValue;
+                return true;
+            }
+            else if (typeof(TOther) == typeof(System.Numerics.BigInteger))
+            {
+                System.Numerics.BigInteger actualValue = (System.Numerics.BigInteger)(object)value;
                 result = actualValue;
                 return true;
             }
@@ -4117,6 +4195,12 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
                 result = actualValue;
                 return true;
             }
+            else if (typeof(TOther) == typeof(System.Numerics.BigInteger))
+            {
+                System.Numerics.BigInteger actualValue = (System.Numerics.BigInteger)(object)value;
+                result = actualValue;
+                return true;
+            }
             else
             {
                 result = default;
@@ -4228,6 +4312,12 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             {
                 nuint actualResult = checked((nuint)value);
                 result = (TOther)(object)actualResult;
+                return true;
+            }
+            else if (typeof(TOther) == typeof(System.Numerics.BigInteger))
+            {
+                System.Numerics.BigInteger actualValue = (System.Numerics.BigInteger)(object)value;
+                result = (TOther)(object)actualValue;
                 return true;
             }
             else
@@ -4415,6 +4505,12 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
                 nuint actualResult = (value >= nuint.MaxValue) ? nuint.MaxValue :
                                      IsNegative(value) ? nuint.MinValue : (nuint)value;
                 result = (TOther)(object)actualResult;
+                return true;
+            }
+            else if (typeof(TOther) == typeof(System.Numerics.BigInteger))
+            {
+                System.Numerics.BigInteger actualValue = (System.Numerics.BigInteger)(object)value;
+                result = (TOther)(object)actualValue;
                 return true;
             }
             else
@@ -4807,20 +4903,18 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
                 result = (TOther)(object)actualResult;
                 return true;
             }
+            else if (typeof(TOther) == typeof(System.Numerics.BigInteger))
+            {
+                System.Numerics.BigInteger actualValue = (System.Numerics.BigInteger)(object)value;
+                result = (TOther)(object)actualValue;
+                return true;
+            }
             else
             {
                 result = default;
                 return false;
             }
         }
-
-        //
-        // IParsable
-        //
-
-        /// <inheritdoc cref="IParsable{TSelf}.TryParse(string?, IFormatProvider?, out TSelf)" />
-        public static bool TryParse([NotNullWhen(true)] string? s, IFormatProvider? provider, out BigInteger result) => TryParse(s, NumberStyles.Integer, provider, out result);
-
         //
         // IShiftOperators
         //
@@ -4834,6 +4928,19 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
 
         /// <inheritdoc cref="ISignedNumber{TSelf}.NegativeOne" />
         static BigInteger ISignedNumber<BigInteger>.NegativeOne => MinusOne;
+
+        public bool TryFormat(Span<char> destination, out int charsWritten, [StringSyntax(StringSyntaxAttribute.NumericFormat)] ReadOnlySpan<char> format = default, IFormatProvider? provider = null)
+        {
+            return Number.TryFormatBigInteger(this, format, NumberFormatInfo.GetInstance(provider), destination, out charsWritten);
+        }
+#endif
+
+        //
+        // IParsable
+        //
+
+        /// <inheritdoc cref="IParsable{TSelf}.TryParse(string?, IFormatProvider?, out TSelf)" />
+        public static bool TryParse([NotNullWhen(true)] string? s, IFormatProvider? provider, out BigInteger result) => TryParse(s, NumberStyles.Integer, provider, out result);
 
         //
         // ISpanParsable

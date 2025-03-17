@@ -11,7 +11,7 @@ namespace Kzrnm.Numerics.Logic
 {
     static partial class BigIntegerCalculator
     {
-#if DEBUG
+#if DEBUG && !Embedding
         // Mutable for unit testing...
         internal static
 #else
@@ -47,7 +47,7 @@ namespace Kzrnm.Numerics.Logic
             {
                 Debug.Assert(value.Length >= 3);
                 Debug.Assert(bits.Length >= value.Length + value.Length);
-                Debug.Assert(bits.Trim(0u).IsEmpty);
+                Debug.Assert(!bits.ContainsAnyExcept(0u));
 
                 // Based on the Toom-Cook multiplication we split left/right
                 // into some smaller values, doing recursive multiplication.
@@ -84,7 +84,7 @@ namespace Kzrnm.Numerics.Logic
             static void Karatsuba(ReadOnlySpan<uint> value, Span<uint> bits)
             {
                 Debug.Assert(bits.Length == value.Length + value.Length);
-                Debug.Assert(bits.Trim(0u).IsEmpty);
+                Debug.Assert(!bits.ContainsAnyExcept(0u));
 
                 // The special form of the Toom-Cook multiplication, where we
                 // split both operands into two operands, is also known
@@ -146,7 +146,7 @@ namespace Kzrnm.Numerics.Logic
             static void Naive(ReadOnlySpan<uint> value, Span<uint> bits)
             {
                 Debug.Assert(bits.Length == value.Length + value.Length);
-                Debug.Assert(bits.Trim(0u).IsEmpty);
+                Debug.Assert(!bits.ContainsAnyExcept(0u));
 
                 // Switching to managed references helps eliminating
                 // index bounds check...
@@ -215,7 +215,7 @@ namespace Kzrnm.Numerics.Logic
             Debug.Assert(left.Length >= right.Length);
             Debug.Assert(right.Length >= 0);
             Debug.Assert(right.IsEmpty || bits.Length >= left.Length + right.Length);
-            Debug.Assert(bits.Trim(0u).IsEmpty);
+            Debug.Assert(!bits.ContainsAnyExcept(0u));
             Debug.Assert(MultiplyKaratsubaThreshold >= 2);
             Debug.Assert(MultiplyToom3Threshold >= 9);
             Debug.Assert(MultiplyKaratsubaThreshold <= MultiplyToom3Threshold);
@@ -243,7 +243,7 @@ namespace Kzrnm.Numerics.Logic
                 Debug.Assert(left.Length >= 3);
                 Debug.Assert(left.Length >= right.Length);
                 Debug.Assert(bits.Length >= left.Length + right.Length);
-                Debug.Assert(bits.Trim(0u).IsEmpty);
+                Debug.Assert(!bits.ContainsAnyExcept(0u));
 
                 // Based on the Toom-Cook multiplication we split left/right
                 // into some smaller values, doing recursive multiplication.
@@ -292,7 +292,7 @@ namespace Kzrnm.Numerics.Logic
                 Debug.Assert(right.Length > n);
                 Debug.Assert(right.Length <= 2 * n);
                 Debug.Assert(bits.Length >= left.Length + right.Length);
-                Debug.Assert(bits.Trim(0u).IsEmpty);
+                Debug.Assert(!bits.ContainsAnyExcept(0u));
 
                 ReadOnlySpan<uint> left0 = left.Slice(0, n).TrimEnd(0u);
                 ReadOnlySpan<uint> left1 = left.Slice(n, n).TrimEnd(0u);
@@ -401,7 +401,7 @@ namespace Kzrnm.Numerics.Logic
 
                 Debug.Assert(left.Length >= right.Length);
                 Debug.Assert(bits.Length >= left.Length + right.Length);
-                Debug.Assert(bits.Trim(0u).IsEmpty);
+                Debug.Assert(!bits.ContainsAnyExcept(0u));
 
                 // ... we need to determine our new length (just the half)
                 Debug.Assert(2 * n - left.Length is 0 or 1);
@@ -482,7 +482,7 @@ namespace Kzrnm.Numerics.Logic
                 Debug.Assert(2 * n - left.Length is 0 or 1);
                 Debug.Assert(right.Length <= n);
                 Debug.Assert(bits.Length >= left.Length + right.Length);
-                Debug.Assert(bits.Trim(0u).IsEmpty);
+                Debug.Assert(!bits.ContainsAnyExcept(0u));
 
                 // ... split left like a = (a_1 << n) + a_0
                 ReadOnlySpan<uint> leftLow = left.Slice(0, n);
@@ -848,7 +848,11 @@ namespace Kzrnm.Numerics.Logic
             uint carry = 0;
             for (int i = bits.Length - 1; i >= 0; i--)
             {
-                (uint quo, uint rem) = Math.DivRem(bits[i], 3);
+                var quo = bits[i] / 3;
+                var rem = bits[i] - quo * 3;
+
+                Debug.Assert(carry < 3);
+                Debug.Assert(rem < 3);
 
                 Debug.Assert(carry < 3);
 

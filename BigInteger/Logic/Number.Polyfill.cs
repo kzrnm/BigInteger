@@ -10,74 +10,6 @@ using System.Numerics;
 
 namespace Kzrnm.Numerics.Logic
 {
-    // Polyfill CoreLib internal interfaces and methods
-    // Define necessary members only
-#if Embedding
-    public
-#else
-    internal
-#endif
-    interface IUtfChar<TSelf> :
-        IEquatable<TSelf>
-        where TSelf : unmanaged, IUtfChar<TSelf>
-    {
-        public static abstract TSelf CastFrom(byte value);
-
-        public static abstract TSelf CastFrom(char value);
-
-        public static abstract TSelf CastFrom(int value);
-
-        public static abstract TSelf CastFrom(uint value);
-
-        public static abstract TSelf CastFrom(ulong value);
-
-        public static abstract uint CastToUInt32(TSelf value);
-    }
-
-
-#if NET8_0_OR_GREATER
-#pragma warning disable CA1067 // Polyfill only type
-    internal readonly struct Utf16Char(char ch) : IUtfChar<Utf16Char>
-#pragma warning restore CA1067
-    {
-        private readonly char value = ch;
-#else
-    internal readonly struct Utf16Char : IUtfChar<Utf16Char>
-    {
-        public Utf16Char(char ch) { value = ch; }
-        private readonly char value;
-#endif
-
-        public static Utf16Char CastFrom(byte value) => new((char)value);
-        public static Utf16Char CastFrom(char value) => new(value);
-        public static Utf16Char CastFrom(int value) => new((char)value);
-        public static Utf16Char CastFrom(uint value) => new((char)value);
-        public static Utf16Char CastFrom(ulong value) => new((char)value);
-        public static uint CastToUInt32(Utf16Char value) => value.value;
-        public bool Equals(Utf16Char other) => value == other.value;
-    }
-
-#if NET8_0_OR_GREATER
-#pragma warning disable CA1067 // Polyfill only type
-    internal readonly struct Utf8Char(byte ch) : IUtfChar<Utf8Char>
-#pragma warning restore CA1067
-    {
-        private readonly byte value = ch;
-#else
-    internal readonly struct Utf8Char : IUtfChar<Utf8Char>
-    {
-        public Utf8Char(byte ch) { value = ch; }
-        private readonly byte value;
-#endif
-        public static Utf8Char CastFrom(byte value) => new(value);
-        public static Utf8Char CastFrom(char value) => new((byte)value);
-        public static Utf8Char CastFrom(int value) => new((byte)value);
-        public static Utf8Char CastFrom(uint value) => new((byte)value);
-        public static Utf8Char CastFrom(ulong value) => new((byte)value);
-        public static uint CastToUInt32(Utf8Char value) => value.value;
-        public bool Equals(Utf8Char other) => value == other.value;
-    }
-
     static partial class Number
     {
         internal static bool AllowHyphenDuringParsing(this NumberFormatInfo info)
@@ -98,92 +30,79 @@ namespace Kzrnm.Numerics.Logic
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static ReadOnlySpan<T> PositiveSignTChar<T>(this NumberFormatInfo info)
-            where T : unmanaged, IUtfChar<T>
+        static ReadOnlySpan<T> StrToSpan<T>(string v)
+            where T : unmanaged
         {
-            Debug.Assert(typeof(T) == typeof(Utf16Char));
-            return MemoryMarshal.Cast<char, T>(info.PositiveSign);
+            var s = v.AsSpan();
+            if (typeof(T) == typeof(char))
+                return MemoryMarshal.Cast<char, T>(s);
+            return default;
         }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static ReadOnlySpan<T> PositiveSignTChar<T>(this NumberFormatInfo info)
+            where T : unmanaged
+            => StrToSpan<T>(info.PositiveSign);
+
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static ReadOnlySpan<T> NegativeSignTChar<T>(this NumberFormatInfo info)
-            where T : unmanaged, IUtfChar<T>
-        {
-            Debug.Assert(typeof(T) == typeof(Utf16Char));
-            return MemoryMarshal.Cast<char, T>(info.NegativeSign);
-        }
+            where T : unmanaged
+            => StrToSpan<T>(info.NegativeSign);
+
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static ReadOnlySpan<T> CurrencySymbolTChar<T>(this NumberFormatInfo info)
-            where T : unmanaged, IUtfChar<T>
-        {
-            Debug.Assert(typeof(T) == typeof(Utf16Char));
-            return MemoryMarshal.Cast<char, T>(info.CurrencySymbol);
-        }
+            where T : unmanaged
+            => StrToSpan<T>(info.CurrencySymbol);
+
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static ReadOnlySpan<T> PercentSymbolTChar<T>(this NumberFormatInfo info)
-            where T : unmanaged, IUtfChar<T>
-        {
-            Debug.Assert(typeof(T) == typeof(Utf16Char));
-            return MemoryMarshal.Cast<char, T>(info.PercentSymbol);
-        }
+            where T : unmanaged
+            => StrToSpan<T>(info.PercentSymbol);
+
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static ReadOnlySpan<T> PerMilleSymbolTChar<T>(this NumberFormatInfo info)
-            where T : unmanaged, IUtfChar<T>
-        {
-            Debug.Assert(typeof(T) == typeof(Utf16Char));
-            return MemoryMarshal.Cast<char, T>(info.PerMilleSymbol);
-        }
+            where T : unmanaged
+            => StrToSpan<T>(info.PerMilleSymbol);
+
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static ReadOnlySpan<T> CurrencyDecimalSeparatorTChar<T>(this NumberFormatInfo info)
-            where T : unmanaged, IUtfChar<T>
-        {
-            Debug.Assert(typeof(T) == typeof(Utf16Char));
-            return MemoryMarshal.Cast<char, T>(info.CurrencyDecimalSeparator);
-        }
+            where T : unmanaged
+            => StrToSpan<T>(info.CurrencyDecimalSeparator);
+
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static ReadOnlySpan<T> CurrencyGroupSeparatorTChar<T>(this NumberFormatInfo info)
-            where T : unmanaged, IUtfChar<T>
-        {
-            Debug.Assert(typeof(T) == typeof(Utf16Char));
-            return MemoryMarshal.Cast<char, T>(info.CurrencyGroupSeparator);
-        }
+            where T : unmanaged
+            => StrToSpan<T>(info.CurrencyGroupSeparator);
+
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static ReadOnlySpan<T> NumberDecimalSeparatorTChar<T>(this NumberFormatInfo info)
-            where T : unmanaged, IUtfChar<T>
-        {
-            Debug.Assert(typeof(T) == typeof(Utf16Char));
-            return MemoryMarshal.Cast<char, T>(info.NumberDecimalSeparator);
-        }
+            where T : unmanaged
+            => StrToSpan<T>(info.NumberDecimalSeparator);
+
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static ReadOnlySpan<T> NumberGroupSeparatorTChar<T>(this NumberFormatInfo info)
-            where T : unmanaged, IUtfChar<T>
-        {
-            Debug.Assert(typeof(T) == typeof(Utf16Char));
-            return MemoryMarshal.Cast<char, T>(info.NumberGroupSeparator);
-        }
+            where T : unmanaged
+            => StrToSpan<T>(info.NumberGroupSeparator);
+
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static ReadOnlySpan<T> PercentDecimalSeparatorTChar<T>(this NumberFormatInfo info)
-            where T : unmanaged, IUtfChar<T>
-        {
-            Debug.Assert(typeof(T) == typeof(Utf16Char));
-            return MemoryMarshal.Cast<char, T>(info.PercentDecimalSeparator);
-        }
+            where T : unmanaged
+            => StrToSpan<T>(info.PercentDecimalSeparator);
+
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static ReadOnlySpan<T> PercentGroupSeparatorTChar<T>(this NumberFormatInfo info)
-            where T : unmanaged, IUtfChar<T>
-        {
-            Debug.Assert(typeof(T) == typeof(Utf16Char));
-            return MemoryMarshal.Cast<char, T>(info.PercentGroupSeparator);
-        }
+            where T : unmanaged
+            => StrToSpan<T>(info.PercentGroupSeparator);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int CountDigits(uint value)
