@@ -4936,6 +4936,10 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
         {
             return Number.TryFormatBigInteger(this, format, NumberFormatInfo.GetInstance(provider), destination, out charsWritten);
         }
+        public bool TryFormat(Span<byte> utf8Destination, out int charsWritten, [StringSyntax(StringSyntaxAttribute.NumericFormat)] ReadOnlySpan<char> format = default, IFormatProvider? provider = null)
+        {
+            return Number.TryFormatBigInteger(this, format, NumberFormatInfo.GetInstance(provider), utf8Destination, out charsWritten);
+        }
 #endif
 
         //

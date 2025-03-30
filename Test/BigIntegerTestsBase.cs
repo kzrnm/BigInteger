@@ -1,4 +1,6 @@
+using System.Globalization;
 using System.Reflection;
+using System.Text;
 
 namespace Kzrnm.Numerics.Test
 {
@@ -8,12 +10,27 @@ namespace Kzrnm.Numerics.Test
             = (Func<string, IFormatProvider?, T>)typeof(T).GetMethod("Parse", BindingFlags.Static | BindingFlags.Public, binder: null, [typeof(string), typeof(IFormatProvider)], modifiers: null)!
             .CreateDelegate(typeof(Func<string, IFormatProvider?, T>));
 
+        static Func<string, NumberStyles, IFormatProvider?, T> ParseStyleDelegate
+            = (Func<string, NumberStyles, IFormatProvider?, T>)typeof(T).GetMethod("Parse", BindingFlags.Static | BindingFlags.Public, binder: null, [typeof(string), typeof(NumberStyles), typeof(IFormatProvider)], modifiers: null)!
+            .CreateDelegate(typeof(Func<string, NumberStyles, IFormatProvider?, T>));
+
+        protected delegate bool TryFormatUtf8(Span<byte> utf8Destination, out int bytesWritten, ReadOnlySpan<char> format = default, IFormatProvider? provider = null);
+        protected static MethodInfo TryFormatUtf8Method
+            = typeof(T).GetMethod(
+                "TryFormat",
+                BindingFlags.Public | BindingFlags.Instance,
+                binder: null,
+                [typeof(Span<byte>), typeof(int).MakeByRefType(), typeof(ReadOnlySpan<char>), typeof(IFormatProvider)],
+                modifiers: null)!;
+
         static Func<T, T, (T, T)> DivRemDelegate
             = (Func<T, T, (T, T)>)typeof(T).GetMethod("DivRem", BindingFlags.Static | BindingFlags.Public, binder: null, [typeof(T), typeof(T)], modifiers: null)!
             .CreateDelegate(typeof(Func<T, T, (T, T)>));
 
-        static dynamic Parse(string s, IFormatProvider? provider)
+        protected static dynamic Parse(string s, IFormatProvider? provider)
             => ParseDelegate.Invoke(s, provider)!;
+        protected static dynamic Parse(string s, NumberStyles styles, IFormatProvider? provider)
+            => ParseStyleDelegate.Invoke(s, styles, provider)!;
 
         public record BigIntegerData(string Left, string Right)
         {
@@ -175,31 +192,33 @@ namespace Kzrnm.Numerics.Test
             }
         }
 
+
         [Fact]
         public void ParseAndFormat()
         {
-            {
-                var s = "9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999";
-                var num = (T)Parse(s, null);
-                $"{num}".ShouldBe(s);
-                num.ToString().ShouldBe(s);
-            }
-            {
-                var s = "-1111111111111111111111111111111111111111";
-                var num = (T)Parse(s, null);
-                num.ToString().ShouldBe(s);
-            }
+            Test("9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999");
+            Test("-1111111111111111111111111111111111111111");
             for (int i = 1; i < 1000; i++)
             {
                 var s = new string('9', i);
+                Test(s);
+                Test($"-{s}");
+            }
+
+            void Test(string s, string format = "")
+            {
                 var num = (T)Parse(s, null);
                 $"{num}".ShouldBe(s);
                 num.ToString().ShouldBe(s);
-
-                s = $"-{s}";
-                num = (T)Parse(s, null);
-                $"{num}".ShouldBe(s);
-                num.ToString().ShouldBe(s);
+#if NET7_0_OR_GREATER
+                {
+                    var TryFormatUtf8Delegate = (TryFormatUtf8)Delegate.CreateDelegate(typeof(TryFormatUtf8), num, TryFormatUtf8Method);
+                    var dst = new byte[s.Length];
+                    TryFormatUtf8Delegate(dst, out int bytesWritten).ShouldBeTrue();
+                    bytesWritten.ShouldBe(s.Length);
+                    dst.ShouldBe(System.Text.Encoding.UTF8.GetBytes(s));
+                }
+#endif
             }
         }
 

@@ -2,11 +2,11 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
-using System.Diagnostics;
 using System.Globalization;
+using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using System.Numerics;
+using System.Text;
 
 namespace Kzrnm.Numerics.Logic
 {
@@ -33,9 +33,20 @@ namespace Kzrnm.Numerics.Logic
         static ReadOnlySpan<T> StrToSpan<T>(string v)
             where T : unmanaged
         {
-            var s = v.AsSpan();
             if (typeof(T) == typeof(char))
-                return MemoryMarshal.Cast<char, T>(s);
+#if NET9_0_OR_GREATER
+                return Unsafe.BitCast<ReadOnlySpan<char>, ReadOnlySpan<T>>(v);
+#else
+                return MemoryMarshal.Cast<char, T>(v.AsSpan());
+#endif
+            if (typeof(T) == typeof(byte))
+            {
+#if NET9_0_OR_GREATER
+                return Unsafe.BitCast<Span<byte>, Span<T>>(Encoding.UTF8.GetBytes(v).AsSpan());
+#else
+                return MemoryMarshal.Cast<byte, T>(Encoding.UTF8.GetBytes(v));
+#endif
+            }
             return default;
         }
 

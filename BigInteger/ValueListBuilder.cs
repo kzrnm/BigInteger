@@ -62,22 +62,6 @@ namespace System.Collections.Generic
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Append(T c, int count)
-        {
-            if (_pos > _span.Length - count)
-            {
-                Grow(count);
-            }
-
-            var dst = _span.Slice(_pos, count);
-            for (int i = 0; i < dst.Length; i++)
-            {
-                dst[i] = c;
-            }
-            _pos += count;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Append(scoped ReadOnlySpan<T> source)
         {
             int pos = _pos;

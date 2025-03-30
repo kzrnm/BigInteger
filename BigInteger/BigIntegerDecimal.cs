@@ -6,13 +6,12 @@ using System.Globalization;
 using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
-#if NET7_0_OR_GREATER
 using System.Runtime.InteropServices;
-#endif
 
 namespace Kzrnm.Numerics
 {
     using Decimal;
+    using System.Buffers.Text;
 
     [DebuggerDisplay("{DebuggerDisplay,nq}")]
     public struct BigIntegerDecimal
@@ -232,7 +231,27 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
 
             return TryParseBigIntegerNumber(value, style, NumberFormatInfo.GetInstance(provider), out result) == ParsingStatus.OK;
         }
-        static ParsingStatus TryParseBigIntegerNumber(ReadOnlySpan<char> value, NumberStyles style, NumberFormatInfo info, out BigIntegerDecimal result)
+
+
+        public static BigIntegerDecimal Parse(ReadOnlySpan<byte> utf8, NumberStyles style = NumberStyles.Integer, IFormatProvider? provider = null)
+        {
+            if (!TryParse(utf8, style, provider, out BigIntegerDecimal result))
+                throw new FormatException();
+            return result;
+        }
+        public static bool TryParse(ReadOnlySpan<byte> utf8, out BigIntegerDecimal result)
+        {
+            return TryParse(utf8, NumberStyles.Integer, NumberFormatInfo.CurrentInfo, out result);
+        }
+
+        public static bool TryParse(ReadOnlySpan<byte> utf8, NumberStyles style, IFormatProvider? provider, out BigIntegerDecimal result)
+        {
+            ValidateParseStyleInteger(style);
+
+            return TryParseBigIntegerNumber(utf8, style, NumberFormatInfo.GetInstance(provider), out result) == ParsingStatus.OK;
+        }
+        static ParsingStatus TryParseBigIntegerNumber<T>(ReadOnlySpan<T> value, NumberStyles style, NumberFormatInfo info, out BigIntegerDecimal result)
+            where T : unmanaged, IEquatable<T>
         {
             scoped Span<byte> buffer;
             byte[]? arrayFromPool = null;
@@ -902,14 +921,45 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
         }
 
         public bool TryFormat(Span<char> destination, out int charsWritten, [StringSyntax(StringSyntaxAttribute.NumericFormat)] ReadOnlySpan<char> format = default, IFormatProvider? provider = null)
+            => TryFormatCore(destination, out charsWritten, format, provider);
+
+        public bool TryFormat(Span<byte> utf8Destination, out int bytesWritten, [StringSyntax(StringSyntaxAttribute.NumericFormat)] ReadOnlySpan<char> format = default, IFormatProvider? provider = null)
+            => TryFormatCore(utf8Destination, out bytesWritten, format, provider);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static bool TryFormatSmall<T>(int sign, Span<T> destination, out int charsWritten)
+            where T : unmanaged
+        {
+            if (typeof(T) == typeof(byte))
+                return sign.TryFormat(MemoryMarshal.AsBytes(destination), out charsWritten);
+            if (typeof(T) == typeof(char))
+                return sign.TryFormat(MemoryMarshal.Cast<T, char>(destination), out charsWritten);
+
+            charsWritten = 0;
+            return false;
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static bool TryFormatSmallD9<T>(uint sign, Span<T> destination, out int charsWritten)
+            where T : unmanaged
+        {
+            if (typeof(T) == typeof(byte))
+                return Utf8Formatter.TryFormat(sign, MemoryMarshal.AsBytes(destination), out charsWritten, new StandardFormat('D', 9));
+            if (typeof(T) == typeof(char))
+                return sign.TryFormat(MemoryMarshal.Cast<T, char>(destination), out charsWritten, "D9");
+
+            charsWritten = 0;
+            return false;
+        }
+        bool TryFormatCore<T>(Span<T> destination, out int charsWritten, [StringSyntax(StringSyntaxAttribute.NumericFormat)] ReadOnlySpan<char> format = default, IFormatProvider? provider = null)
+            where T : unmanaged
         {
             const int BaseLog = BigIntegerCalculator.BaseLog;
             if (_dig == null)
             {
-                return _sign.TryFormat(destination, out charsWritten);
+                return TryFormatSmall(_sign, destination, out charsWritten);
             }
-            Span<char> firstBuffer = stackalloc char[10];
-            if (!_dig[^1].TryFormat(firstBuffer, out var first))
+            Span<T> firstBuffer = stackalloc T[10];
+            if (!TryFormatSmall((int)_dig[^1], firstBuffer, out var first))
             {
                 charsWritten = 0;
                 return false;
@@ -926,7 +976,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
 
             if (_sign < 0)
             {
-                destination[0] = '-';
+                destination[0] = SR.CastFrom<T>('-');
                 destination = destination[1..];
             }
 
@@ -935,7 +985,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
 
             for (int i = digits.Length - 1; i >= 0; i--)
             {
-                digits[i].TryFormat(destination, out _, "D9");
+                TryFormatSmallD9(digits[i], destination, out _);
                 destination = destination[BaseLog..];
             }
 
@@ -2569,5 +2619,10 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
 
         /// <inheritdoc cref="ISpanParsable{TSelf}.TryParse(ReadOnlySpan{char}, IFormatProvider?, out TSelf)" />
         public static bool TryParse(ReadOnlySpan<char> s, IFormatProvider? provider, out BigIntegerDecimal result) => TryParse(s, NumberStyles.Integer, provider, out result);
+
+
+        public static BigIntegerDecimal Parse(ReadOnlySpan<byte> utf8, IFormatProvider? provider) => Parse(utf8, NumberStyles.Integer, provider);
+
+        public static bool TryParse(ReadOnlySpan<byte> utf8, IFormatProvider? provider, out BigIntegerDecimal result) => TryParse(utf8, NumberStyles.Integer, provider, out result);
     }
 }

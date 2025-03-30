@@ -1,6 +1,7 @@
 using Kzrnm.Numerics.Logic;
 using System.Globalization;
 using System.Numerics;
+using System.Text;
 
 namespace Kzrnm.Numerics.Test
 {
@@ -270,6 +271,28 @@ namespace Kzrnm.Numerics.Test
                 my.ToString().ShouldBe(expectedStr);
             }
         }
+
+
+#if NET7_0_OR_GREATER
+        [Fact]
+        public void ParseAndFormatCurrency()
+        {
+            Test("¤999,999,999,999,999,999,999,999,999,999,999,999,999,999,999,999,999,999,999.00");
+
+            void Test(string s)
+            {
+                var num = Parse(s, NumberStyles.Currency, CultureInfo.InvariantCulture);
+                ((string)num.ToString("C", CultureInfo.InvariantCulture)).ShouldBe(s);
+                {
+                    var TryFormatUtf8Delegate = (TryFormatUtf8)Delegate.CreateDelegate(typeof(TryFormatUtf8), (BigInteger)num, TryFormatUtf8Method);
+                    var dst = new byte[Encoding.UTF8.GetByteCount(s)];
+                    TryFormatUtf8Delegate(dst, out int bytesWritten, "C", CultureInfo.InvariantCulture).ShouldBeTrue();
+                    bytesWritten.ShouldBe(Encoding.UTF8.GetByteCount(s));
+                    dst.ShouldBe(Encoding.UTF8.GetBytes(s));
+                }
+            }
+        }
+#endif
     }
 
     [Collection(nameof(DisableParallelization))]

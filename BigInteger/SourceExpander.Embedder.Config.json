@@ -10,6 +10,7 @@
     "DEBUG"
   ],
   "exclude-attributes": [
+    "System.Diagnostics.CodeAnalysis.StringSyntaxAttribute",
     "System.Diagnostics.DebuggerBrowsableAttribute",
     "System.Diagnostics.DebuggerDisplayAttribute",
     "System.Diagnostics.DebuggerHiddenAttribute",

@@ -10,7 +10,6 @@ using System.Globalization;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using System.Xml;
 
 namespace Kzrnm.Numerics.Logic
 {
@@ -760,7 +759,7 @@ namespace Kzrnm.Numerics.Logic
                     (numberBufferToReturn = ArrayPool<byte>.Shared.Rent(valueDigits + 1));
 
                 scoped NumberBuffer number = new NumberBuffer(NumberBufferKind.Integer, numberBuffer);
-                BigIntegerToDecChars(numberBuffer, base1E9Value, valueDigits);
+                BigIntegerToDecChars(numberBuffer.Slice(0, valueDigits), base1E9Value, valueDigits);
                 number.Digits[^1] = 0;
                 number.DigitsCount = valueDigits;
                 number.Scale = valueDigits;

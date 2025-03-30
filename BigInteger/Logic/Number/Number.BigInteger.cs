@@ -3,6 +3,7 @@
 
 using System;
 using System.Buffers;
+using System.Buffers.Text;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
@@ -10,6 +11,7 @@ using System.Globalization;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace Kzrnm.Numerics.Logic
 {
@@ -571,7 +573,8 @@ namespace Kzrnm.Numerics.Logic
             }
         }
 
-        private static string? FormatBigIntegerToHex(bool targetSpan, BigInteger value, char format, int digits, NumberFormatInfo info, Span<char> destination, out int charsWritten, out bool spanSuccess)
+        private static string? FormatBigIntegerToHex<T>(bool targetSpan, BigInteger value, char format, int digits, NumberFormatInfo info, Span<T> destination, out int charsWritten, out bool spanSuccess)
+            where T : unmanaged, IEquatable<T>
         {
             Debug.Assert(format == 'x' || format == 'X');
 
@@ -586,7 +589,7 @@ namespace Kzrnm.Numerics.Logic
             }
             bits = bits.Slice(0, bytesWrittenOrNeeded);
 
-            var sb = new ValueListBuilder<char>(stackalloc char[128]); // each byte is typically two chars
+            var sb = new ValueListBuilder<T>(stackalloc T[128]); // each byte is typically two chars
 
             int cur = bits.Length - 1;
             if (cur > -1)
@@ -607,23 +610,35 @@ namespace Kzrnm.Numerics.Logic
                 {
                     // {0xF8-0xFF} print as {8-F}
                     // {0x00-0x07} print as {0-7}
-                    sb.Append(head < 10 ?
-                        (char)(head + '0') :
-                        format == 'X' ? (char)((head & 0xF) - 10 + 'A') : (char)((head & 0xF) - 10 + 'a'));
+                    sb.Append(
+                        CastFrom<T>(head < 10 ?
+                        (byte)(head + '0')
+                        : format == 'X'
+                            ? (byte)(head + ('A' - 10))
+                            : (byte)(head + ('a' - 10))));
                     cur--;
                 }
             }
 
             if (cur > -1)
             {
-                Span<char> chars = sb.AppendSpan((cur + 1) * 2);
+                var chars = sb.AppendSpan((cur + 1) * 2);
                 int charsPos = 0;
-                string hexValues = format == 'x' ? "0123456789abcdef" : "0123456789ABCDEF";
                 while (cur > -1)
                 {
                     byte b = bits[cur--];
-                    chars[charsPos++] = hexValues[b >> 4];
-                    chars[charsPos++] = hexValues[b & 0xF];
+                    var hi = b >> 4;
+                    var lo = b & 0xF;
+                    chars[charsPos++] = CastFrom<T>(hi < 10 ?
+                        (byte)(hi + '0')
+                        : format == 'X'
+                            ? (byte)(hi + ('A' - 10))
+                            : (byte)(hi + ('a' - 10)));
+                    chars[charsPos++] = CastFrom<T>(lo < 10 ?
+                        (byte)(lo + '0')
+                        : format == 'X'
+                            ? (byte)(lo + ('A' - 10))
+                            : (byte)(lo + ('a' - 10)));
                 }
             }
 
@@ -632,7 +647,7 @@ namespace Kzrnm.Numerics.Logic
                 // Insert leading zeros, e.g. user specified "X5" so we create "0ABCD" instead of "ABCD"
                 sb.Insert(
                     0,
-                    value._sign >= 0 ? '0' : (format == 'x') ? 'f' : 'F',
+                    CastFrom<T>(value._sign >= 0 ? '0' : (format == 'x') ? 'f' : 'F'),
                     digits - sb.Length);
             }
 
@@ -654,7 +669,8 @@ namespace Kzrnm.Numerics.Logic
             }
         }
 
-        private static string? FormatBigIntegerToBinary(bool targetSpan, BigInteger value, int digits, Span<char> destination, out int charsWritten, out bool spanSuccess)
+        private static string? FormatBigIntegerToBinary<T>(bool targetSpan, BigInteger value, int digits, Span<T> destination, out int charsWritten, out bool spanSuccess)
+            where T : unmanaged, IEquatable<T>
         {
             // Get the bytes that make up the BigInteger.
             byte[]? arrayToReturnToPool = null;
@@ -687,33 +703,34 @@ namespace Kzrnm.Numerics.Logic
             Debug.Assert(digits < Array.MaxLength);
             int charsIncludeDigits = Math.Max(digits, charsForBits);
 
+            if (targetSpan && charsIncludeDigits > destination.Length)
+            {
+                charsWritten = 0;
+                spanSuccess = false;
+                return null;
+            }
+
+
             try
             {
-                scoped ValueListBuilder<char> sb;
+                scoped ValueListBuilder<T> sb;
                 if (targetSpan)
                 {
-                    if (charsIncludeDigits > destination.Length)
-                    {
-                        charsWritten = 0;
-                        spanSuccess = false;
-                        return null;
-                    }
-
                     // Because we have ensured destination can take actual char length, so now just use ValueListBuilder<char> as wrapper so that subsequent logic can be reused by 2 flows (targetSpan and non-targetSpan);
                     // meanwhile there is no need to copy to destination again after format data for targetSpan flow.
-                    sb = new ValueListBuilder<char>(destination);
+                    sb = new ValueListBuilder<T>(destination);
                 }
                 else
                 {
                     // each byte is typically eight chars
                     sb = charsIncludeDigits > 512
-                        ? new ValueListBuilder<char>(charsIncludeDigits)
-                        : new ValueListBuilder<char>(stackalloc char[512]);
+                        ? new ValueListBuilder<T>(charsIncludeDigits)
+                        : new ValueListBuilder<T>(stackalloc T[512]);
                 }
 
                 if (digits > charsForBits)
                 {
-                    sb.Append(value._sign >= 0 ? '0' : '1', digits - charsForBits);
+                    sb.AppendSpan(digits - charsForBits).Fill(CastFrom<T>(value._sign >= 0 ? '0' : '1'));
                 }
 
                 AppendByte(ref sb, highByte, charsInHighByte - 1);
@@ -727,6 +744,7 @@ namespace Kzrnm.Numerics.Logic
 
                 if (targetSpan)
                 {
+                    sb.Dispose();
                     charsWritten = charsIncludeDigits;
                     spanSuccess = true;
                     return null;
@@ -744,18 +762,18 @@ namespace Kzrnm.Numerics.Logic
                 }
             }
 
-            static void AppendByte(ref ValueListBuilder<char> sb, byte b, int startHighBit = 7)
+            static void AppendByte(ref ValueListBuilder<T> sb, byte b, int startHighBit = 7)
             {
                 for (int i = startHighBit; i >= 0; i--)
                 {
-                    sb.Append((char)('0' + ((b >> i) & 0x1)));
+                    sb.Append(CastFrom<T>((byte)('0' + ((b >> i) & 1))));
                 }
             }
         }
 
         internal static string FormatBigInteger(BigInteger value, string? format, NumberFormatInfo info)
         {
-            return FormatBigInteger(targetSpan: false, value, format, format, info, default, out _, out _)!;
+            return FormatBigInteger<char>(targetSpan: false, value, format, format, info, default, out _, out _)!;
         }
 
         internal static bool TryFormatBigInteger(BigInteger value, ReadOnlySpan<char> format, NumberFormatInfo info, Span<char> destination, out int charsWritten)
@@ -763,11 +781,17 @@ namespace Kzrnm.Numerics.Logic
             FormatBigInteger(targetSpan: true, value, null, format, info, destination, out charsWritten, out bool spanSuccess);
             return spanSuccess;
         }
+        internal static bool TryFormatBigInteger(BigInteger value, ReadOnlySpan<char> format, NumberFormatInfo info, Span<byte> destination, out int charsWritten)
+        {
+            FormatBigInteger(targetSpan: true, value, null, format, info, destination, out charsWritten, out bool spanSuccess);
+            return spanSuccess;
+        }
 
-        private static string? FormatBigInteger(
+        private static string? FormatBigInteger<T>(
             bool targetSpan, BigInteger value,
             string? formatString, ReadOnlySpan<char> formatSpan,
-            NumberFormatInfo info, Span<char> destination, out int charsWritten, out bool spanSuccess)
+            NumberFormatInfo info, Span<T> destination, out int charsWritten, out bool spanSuccess)
+            where T : unmanaged, IEquatable<T>
         {
             Debug.Assert(formatString == null || formatString.Length == formatSpan.Length);
 
@@ -791,7 +815,29 @@ namespace Kzrnm.Numerics.Logic
 
                 if (targetSpan)
                 {
-                    spanSuccess = value._sign.TryFormat(destination, out charsWritten, formatSpan, info);
+#if NET9_0_OR_GREATER
+                    spanSuccess = typeof(T) == typeof(byte)
+                        ? value._sign.TryFormat(Unsafe.BitCast<Span<T>, Span<byte>>(destination), out charsWritten, formatSpan, info)
+                        : value._sign.TryFormat(Unsafe.BitCast<Span<T>, Span<char>>(destination), out charsWritten, formatSpan, info);
+#elif NET8_0_OR_GREATER
+                    spanSuccess = typeof(T) == typeof(byte)
+                        ? value._sign.TryFormat(MemoryMarshal.Cast<T, byte>(destination), out charsWritten, formatSpan, info)
+                        : value._sign.TryFormat(MemoryMarshal.Cast<T, char>(destination), out charsWritten, formatSpan, info);
+#else
+                    if (typeof(T) == typeof(byte))
+                    {
+                        Span<char> c = stackalloc char[512];
+                        spanSuccess = value._sign.TryFormat(c, out charsWritten, formatSpan, info);
+                        if (spanSuccess)
+                        {
+                            charsWritten = Encoding.UTF8.GetBytes(c[..charsWritten], MemoryMarshal.Cast<T, byte>(destination));
+                        }
+                    }
+                    else
+                    {
+                        spanSuccess = value._sign.TryFormat(MemoryMarshal.Cast<T, char>(destination), out charsWritten, formatSpan, info);
+                    }
+#endif
                     return null;
                 }
                 else
@@ -838,8 +884,8 @@ namespace Kzrnm.Numerics.Logic
             if (fmt == 'g' || fmt == 'G' || fmt == 'd' || fmt == 'D' || fmt == 'r' || fmt == 'R')
             {
                 int strDigits = Math.Max(digits, valueDigits);
-                string? sNegative = value.Sign < 0 ? info.NegativeSign : null;
-                int strLength = strDigits + (sNegative?.Length ?? 0);
+                var sNegative = value.Sign < 0 ? info.NegativeSignTChar<T>() : null;
+                int strLength = strDigits + sNegative.Length;
 
                 if (targetSpan)
                 {
@@ -850,7 +896,7 @@ namespace Kzrnm.Numerics.Logic
                     }
                     else
                     {
-                        sNegative?.CopyTo(destination);
+                        sNegative.CopyTo(destination);
                         BigIntegerToDecChars(destination.Slice(0, strLength), base1E9Value, digits);
                         charsWritten = strLength;
                         spanSuccess = true;
@@ -862,9 +908,9 @@ namespace Kzrnm.Numerics.Logic
                     spanSuccess = false;
                     charsWritten = 0;
 #if NET9_0_OR_GREATER
-                    strResult = string.Create(strLength, new StrState(digits, base1E9Value, sNegative), static (span, state) =>
+                    strResult = string.Create(strLength, new StrState(digits, base1E9Value, Unsafe.BitCast<ReadOnlySpan<T>, ReadOnlySpan<char>>(sNegative)), static (span, state) =>
                     {
-                        state.sNegative?.CopyTo(span);
+                        state.sNegative.CopyTo(span);
                         BigIntegerToDecChars(span, state.base1E9Value, state.digits);
                     });
 #else
@@ -873,7 +919,7 @@ namespace Kzrnm.Numerics.Logic
                         stackalloc char[strLength] :
                         (numberBufferToReturn = ArrayPool<char>.Shared.Rent(strLength))).Slice(0, strLength);
 
-                    sNegative?.CopyTo(numberBuffer);
+                    info.NegativeSign?.CopyTo(numberBuffer);
                     BigIntegerToDecChars(numberBuffer, base1E9Value, digits);
 
                     strResult = new string(numberBuffer);
@@ -885,19 +931,20 @@ namespace Kzrnm.Numerics.Logic
             }
             else
             {
+                int numberBufferLength = valueDigits + 1;
                 byte[]? numberBufferToReturn = null;
-                Span<byte> numberBuffer = valueDigits + 1 <= CharStackBufferSize ?
-                    stackalloc byte[valueDigits + 1] :
-                    (numberBufferToReturn = ArrayPool<byte>.Shared.Rent(valueDigits + 1));
+                Span<byte> numberBuffer = (numberBufferLength <= CharStackBufferSize ?
+                    stackalloc byte[numberBufferLength] :
+                    (numberBufferToReturn = ArrayPool<byte>.Shared.Rent(numberBufferLength))).Slice(0, numberBufferLength);
 
                 scoped NumberBuffer number = new NumberBuffer(NumberBufferKind.Integer, numberBuffer);
-                BigIntegerToDecChars(numberBuffer, base1E9Value, valueDigits);
+                BigIntegerToDecChars(numberBuffer.Slice(0, valueDigits), base1E9Value, valueDigits);
                 number.Digits[^1] = 0;
                 number.DigitsCount = valueDigits;
                 number.Scale = valueDigits;
                 number.IsNegative = value.Sign < 0;
 
-                scoped var vlb = new ValueListBuilder<char>(stackalloc char[CharStackBufferSize]); // arbitrary stack cut-off
+                scoped var vlb = new ValueListBuilder<T>(stackalloc T[CharStackBufferSize]); // arbitrary stack cut-off
 
                 if (fmt != 0)
                 {
@@ -937,11 +984,11 @@ namespace Kzrnm.Numerics.Logic
 
 #if NET9_0_OR_GREATER
         [StructLayout(LayoutKind.Auto)]
-        readonly ref struct StrState(int digits, ReadOnlySpan<uint> base1E9Value, string? sNegative)
+        readonly ref struct StrState(int digits, ReadOnlySpan<uint> base1E9Value, ReadOnlySpan<char> sNegative)
         {
             public readonly int digits = digits;
             public readonly ReadOnlySpan<uint> base1E9Value = base1E9Value;
-            public readonly string? sNegative = sNegative;
+            public readonly ReadOnlySpan<char> sNegative = sNegative;
         }
 
 #endif
@@ -1497,6 +1544,21 @@ namespace Kzrnm.Numerics.Logic
                 return uint.TryParse(MemoryMarshal.Cast<T, char>(input), TParser.BlockNumberStyle, null, out result);
             }
 
+            if (typeof(T) == typeof(byte))
+            {
+#if NET8_0_OR_GREATER
+                return uint.TryParse(
+#if NET9_0_OR_GREATER
+                    Unsafe.BitCast<ReadOnlySpan<T>, ReadOnlySpan<byte>>(input)
+#else
+                    MemoryMarshal.Cast<T, byte>(input)
+#endif
+                    , TParser.BlockNumberStyle, null, out result);
+#else
+                return Utf8Parser.TryParse(MemoryMarshal.Cast<T, byte>(input), out result, out _, 'x');
+#endif
+            }
+
             throw new NotSupportedException();
         }
 
@@ -1533,6 +1595,17 @@ namespace Kzrnm.Numerics.Logic
         // A valid ASCII hex digit is positive (0-7) if it starts with 00110
         public static uint GetSignBitsIfValid(uint ch) => (uint)((ch & 0b_1111_1000) == 0b_0011_0000 ? 0 : -1);
 
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static bool TryParseUnalignedBlockByte(ReadOnlySpan<byte> input, out uint result)
+        {
+#if NET8_0_OR_GREATER
+            return uint.TryParse(input, BlockNumberStyle, null, out result);
+#else
+            return Utf8Parser.TryParse(input, out result, out _, 'x');
+#endif
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool TryParseWholeBlocks(ReadOnlySpan<T> input, Span<uint> destination)
         {
@@ -1557,6 +1630,22 @@ namespace Kzrnm.Numerics.Logic
                 }
 
                 return true;
+            }
+
+            if (typeof(T) == typeof(byte))
+            {
+                const int DigitsPerBlock = 8;
+                ref byte lastWholeBlockStart = ref Unsafe.As<T, byte>(ref Unsafe.Add(ref MemoryMarshal.GetReference(input), input.Length - DigitsPerBlock));
+
+                for (int i = 0; i < destination.Length; i++)
+                {
+                    if (!TryParseUnalignedBlockByte(
+                        MemoryMarshal.CreateReadOnlySpan(ref Unsafe.Subtract(ref lastWholeBlockStart, i * DigitsPerBlock), DigitsPerBlock),
+                        out destination[i]))
+                    {
+                        return false;
+                    }
+                }
             }
 
             throw new NotSupportedException();
