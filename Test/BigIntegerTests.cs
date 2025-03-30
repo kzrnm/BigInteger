@@ -275,6 +275,8 @@ namespace Kzrnm.Numerics.Test
         [Fact]
         public void ParseAndToStringHexTest()
         {
+            Test("F0000001");
+
             foreach (int i in new int[] { 865, 20161 })
             {
                 Test(new string('7', i));
