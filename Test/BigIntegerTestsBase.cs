@@ -276,7 +276,7 @@ namespace Kzrnm.Numerics.Test
             }
         }
 
-        static IEnumerable<OrigBigInteger> PlusMinus(OrigBigInteger v) => [v - 1, v, v + 1];
+        protected static IEnumerable<OrigBigInteger> PlusMinus(OrigBigInteger v) => [v - 1, v, v + 1];
 
         public static void Equal(T actual, OrigBigInteger expected)
         {

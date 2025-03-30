@@ -4958,5 +4958,18 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
 
         /// <inheritdoc cref="ISpanParsable{TSelf}.TryParse(ReadOnlySpan{char}, IFormatProvider?, out TSelf)" />
         public static bool TryParse(ReadOnlySpan<char> s, IFormatProvider? provider, out BigInteger result) => TryParse(s, NumberStyles.Integer, provider, out result);
+
+#if NET7_0_OR_GREATER
+        public static BigInteger Parse(ReadOnlySpan<byte> utf8, NumberStyles style = NumberStyles.Integer, IFormatProvider? provider = null)
+            => Number.ParseBigInteger(utf8, style, NumberFormatInfo.GetInstance(provider));
+
+        public static bool TryParse(ReadOnlySpan<byte> utf8, out BigInteger result)
+            => TryParse(utf8, NumberStyles.Integer, NumberFormatInfo.CurrentInfo, out result);
+        
+        public static bool TryParse(ReadOnlySpan<byte> utf8, NumberStyles style, IFormatProvider? provider, out BigInteger result)
+            => Number.TryParseBigInteger(utf8, style, NumberFormatInfo.GetInstance(provider), out result) == ParsingStatus.OK;
+        public static BigInteger Parse(ReadOnlySpan<byte> utf8, IFormatProvider? provider) => Parse(utf8, NumberStyles.Integer, provider);
+        public static bool TryParse(ReadOnlySpan<byte> utf8, IFormatProvider? provider, out BigInteger result) => TryParse(utf8, NumberStyles.Integer, provider, out result);
+#endif
     }
 }

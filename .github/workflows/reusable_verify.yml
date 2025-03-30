@@ -19,6 +19,9 @@ env:
 jobs:
   build-resolve:
     runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4

@@ -272,6 +272,64 @@ namespace Kzrnm.Numerics.Test
             }
         }
 
+        [Fact]
+        public void ParseAndToStringHexTest()
+        {
+            foreach (int i in new int[] { 865, 20161 })
+            {
+                Test(new string('7', i));
+                Test(new string('F', i));
+            }
+
+            for (int i = 1; i < 50; i++)
+                Test(new string('0', i));
+
+            for (int i = 0; i < 50; i++)
+                Test("1" + new string('0', i));
+
+            foreach (int i in new int[] { 1000, 10000 })
+                Test("1" + new string('0', i));
+
+            foreach (int i in new int[] { 1000, 10000 })
+                Test(new string('1', i) + new string('0', i));
+
+            for (int i = 1; i < 50; i++)
+                Test(new string('1', i) + new string('0', i));
+
+            for (int i = 1; i < 50; i++)
+                Test(new string('1', 500 + i) + new string('0', 3000 + i));
+            for (int i = 1; i < 50; i++)
+                Test(new string('1', 3000 + i) + new string('0', 3000 + i));
+            for (int i = 1; i < 50; i++)
+                Test("1" + new string('0', 3000 + i));
+
+            foreach (var v in PlusMinus(0))
+                Test(v.ToString("X"));
+            foreach (var v in PlusMinus(int.MinValue))
+                Test(v.ToString("X"));
+            foreach (var v in PlusMinus(int.MaxValue))
+                Test(v.ToString("X"));
+            foreach (var v in PlusMinus(long.MinValue))
+                Test(v.ToString("X"));
+            foreach (var v in PlusMinus(long.MaxValue))
+                Test(v.ToString("X"));
+
+            var rnd = new Random(227);
+            for (int i = 0; i < 100; i++)
+                Test(rnd.GetRandomDigits(rnd.Next(2000, 5000)));
+
+            void Test(string s)
+            {
+                var my = BigInteger.Parse(s, NumberStyles.HexNumber, null);
+                var orig = OrigBigInteger.Parse(s, NumberStyles.HexNumber, null);
+                Equal(my, orig);
+
+#if NET7_0_OR_GREATER
+                my = BigInteger.Parse(Encoding.UTF8.GetBytes(s), NumberStyles.HexNumber, null);
+                Equal(my, orig);
+#endif
+            }
+        }
 
 #if NET7_0_OR_GREATER
         [Fact]
@@ -281,10 +339,10 @@ namespace Kzrnm.Numerics.Test
 
             void Test(string s)
             {
-                var num = Parse(s, NumberStyles.Currency, CultureInfo.InvariantCulture);
-                ((string)num.ToString("C", CultureInfo.InvariantCulture)).ShouldBe(s);
+                var num = BigInteger.Parse(s, NumberStyles.Currency, CultureInfo.InvariantCulture);
+                num.ToString("C", CultureInfo.InvariantCulture).ShouldBe(s);
                 {
-                    var TryFormatUtf8Delegate = (TryFormatUtf8)Delegate.CreateDelegate(typeof(TryFormatUtf8), (BigInteger)num, TryFormatUtf8Method);
+                    var TryFormatUtf8Delegate = (TryFormatUtf8)Delegate.CreateDelegate(typeof(TryFormatUtf8), num, TryFormatUtf8Method);
                     var dst = new byte[Encoding.UTF8.GetByteCount(s)];
                     TryFormatUtf8Delegate(dst, out int bytesWritten, "C", CultureInfo.InvariantCulture).ShouldBeTrue();
                     bytesWritten.ShouldBe(Encoding.UTF8.GetByteCount(s));

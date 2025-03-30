@@ -70,7 +70,8 @@ namespace Kzrnm.Numerics.Logic
             return true;
         }
 
-        internal static ParsingStatus TryParseBigInteger(ReadOnlySpan<char> value, NumberStyles style, NumberFormatInfo info, out BigInteger result)
+        internal static ParsingStatus TryParseBigInteger<T>(ReadOnlySpan<T> value, NumberStyles style, NumberFormatInfo info, out BigInteger result)
+            where T : unmanaged, IBinaryInteger<T>
         {
             if (!TryValidateParseStyleInteger(style, out ArgumentException? e))
             {
@@ -79,20 +80,21 @@ namespace Kzrnm.Numerics.Logic
 
             if ((style & NumberStyles.AllowHexSpecifier) != 0)
             {
-                return TryParseBigIntegerHexOrBinaryNumberStyle<BigIntegerHexParser<char>, char>(value, style, out result);
+                return TryParseBigIntegerHexOrBinaryNumberStyle<BigIntegerHexParser<T>, T>(value, style, out result);
             }
 
 #if NET8_0_OR_GREATER
             if ((style & NumberStyles.AllowBinarySpecifier) != 0)
             {
-                return TryParseBigIntegerHexOrBinaryNumberStyle<BigIntegerBinaryParser<char>, char>(value, style, out result);
+                return TryParseBigIntegerHexOrBinaryNumberStyle<BigIntegerBinaryParser<T>, T>(value, style, out result);
             }
 #endif
 
             return TryParseBigIntegerNumber(value, style, info, out result);
         }
 
-        internal static ParsingStatus TryParseBigIntegerNumber(ReadOnlySpan<char> value, NumberStyles style, NumberFormatInfo info, out BigInteger result)
+        internal static ParsingStatus TryParseBigIntegerNumber<T>(ReadOnlySpan<T> value, NumberStyles style, NumberFormatInfo info, out BigInteger result)
+            where T : unmanaged, IBinaryInteger<T>
         {
             scoped Span<byte> buffer;
             byte[]? arrayFromPool = null;
@@ -131,7 +133,8 @@ namespace Kzrnm.Numerics.Logic
             return ret;
         }
 
-        internal static BigInteger ParseBigInteger(ReadOnlySpan<char> value, NumberStyles style, NumberFormatInfo info)
+        internal static BigInteger ParseBigInteger<T>(ReadOnlySpan<T> value, NumberStyles style, NumberFormatInfo info)
+            where T : unmanaged, IBinaryInteger<T>
         {
             if (!TryValidateParseStyleInteger(style, out ArgumentException? e))
             {
@@ -1646,6 +1649,8 @@ namespace Kzrnm.Numerics.Logic
                         return false;
                     }
                 }
+
+                return true;
             }
 
             throw new NotSupportedException();
