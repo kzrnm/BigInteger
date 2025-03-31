@@ -1,4 +1,4 @@
-#if !NET7_0_OR_GREATER
+#if !NETCOREAPP3_1_OR_GREATER
 using System.Numerics;
 
 namespace Kzrnm.Numerics.Test

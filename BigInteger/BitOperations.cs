@@ -1,9 +1,9 @@
 #if !NET7_0_OR_GREATER
 using System.Runtime.CompilerServices;
 
-namespace System.Numerics
+namespace Kzrnm.Numerics
 {
-    public static class BitOperations
+    internal static class BitOperations
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int Log2(uint value)
