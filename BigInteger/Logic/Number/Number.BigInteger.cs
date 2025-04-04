@@ -818,14 +818,10 @@ namespace Kzrnm.Numerics.Logic
 
                 if (targetSpan)
                 {
-#if NET9_0_OR_GREATER
+#if NET8_0_OR_GREATER
                     spanSuccess = typeof(T) == typeof(byte)
-                        ? value._sign.TryFormat(Unsafe.BitCast<Span<T>, Span<byte>>(destination), out charsWritten, formatSpan, info)
-                        : value._sign.TryFormat(Unsafe.BitCast<Span<T>, Span<char>>(destination), out charsWritten, formatSpan, info);
-#elif NET8_0_OR_GREATER
-                    spanSuccess = typeof(T) == typeof(byte)
-                        ? value._sign.TryFormat(MemoryMarshal.Cast<T, byte>(destination), out charsWritten, formatSpan, info)
-                        : value._sign.TryFormat(MemoryMarshal.Cast<T, char>(destination), out charsWritten, formatSpan, info);
+                        ? value._sign.TryFormat(SpanCast<T, byte>(destination), out charsWritten, formatSpan, info)
+                        : value._sign.TryFormat(SpanCast<T, char>(destination), out charsWritten, formatSpan, info);
 #else
                     if (typeof(T) == typeof(byte))
                     {
@@ -838,7 +834,7 @@ namespace Kzrnm.Numerics.Logic
                     }
                     else
                     {
-                        spanSuccess = value._sign.TryFormat(MemoryMarshal.Cast<T, char>(destination), out charsWritten, formatSpan, info);
+                        spanSuccess = value._sign.TryFormat(SpanCast<T, char>(destination), out charsWritten, formatSpan, info);
                     }
 #endif
                     return null;
@@ -911,7 +907,7 @@ namespace Kzrnm.Numerics.Logic
                     spanSuccess = false;
                     charsWritten = 0;
 #if NET9_0_OR_GREATER
-                    strResult = string.Create(strLength, new StrState(digits, base1E9Value, Unsafe.BitCast<ReadOnlySpan<T>, ReadOnlySpan<char>>(sNegative)), static (span, state) =>
+                    strResult = string.Create(strLength, new StrState(digits, base1E9Value, SpanCast<T, char>(sNegative)), static (span, state) =>
                     {
                         state.sNegative.CopyTo(span);
                         BigIntegerToDecChars(span, state.base1E9Value, state.digits);
@@ -1544,25 +1540,19 @@ namespace Kzrnm.Numerics.Logic
         {
             if (typeof(T) == typeof(char))
             {
-                return uint.TryParse(MemoryMarshal.Cast<T, char>(input), TParser.BlockNumberStyle, null, out result);
+                return uint.TryParse(SpanCast<T, char>(input), TParser.BlockNumberStyle, null, out result);
             }
 
             if (typeof(T) == typeof(byte))
             {
 #if NET8_0_OR_GREATER
-                return uint.TryParse(
-#if NET9_0_OR_GREATER
-                    Unsafe.BitCast<ReadOnlySpan<T>, ReadOnlySpan<byte>>(input)
+                return uint.TryParse(SpanCast<T, byte>(input), TParser.BlockNumberStyle, null, out result);
 #else
-                    MemoryMarshal.Cast<T, byte>(input)
-#endif
-                    , TParser.BlockNumberStyle, null, out result);
-#else
-                return Utf8Parser.TryParse(MemoryMarshal.Cast<T, byte>(input), out result, out _, 'x');
+                return Utf8Parser.TryParse(SpanCast<T, byte>(input), out result, out _, 'x');
 #endif
             }
-
-            throw new NotSupportedException();
+            result = 0;
+            return false;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1600,60 +1590,30 @@ namespace Kzrnm.Numerics.Logic
 
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static bool TryParseUnalignedBlockByte(ReadOnlySpan<byte> input, out uint result)
-        {
-#if NET8_0_OR_GREATER
-            return uint.TryParse(input, BlockNumberStyle, null, out result);
-#else
-            return Utf8Parser.TryParse(input, out result, out _, 'x');
-#endif
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool TryParseWholeBlocks(ReadOnlySpan<T> input, Span<uint> destination)
         {
             if (typeof(T) == typeof(char))
             {
-#if NET9_0_OR_GREATER
-                if (Convert.FromHexString(MemoryMarshal.Cast<T, char>(input), MemoryMarshal.AsBytes(destination), out _, out _) != OperationStatus.Done)
-#else
-                if (!HexConverter.TryDecodeFromUtf16(MemoryMarshal.Cast<T, char>(input), MemoryMarshal.AsBytes(destination), out _))
-#endif
-                {
+                if (!HexConverter.TryDecode(SpanCast<T, char>(input), MemoryMarshal.AsBytes(destination), out _))
                     return false;
-                }
-
-                if (BitConverter.IsLittleEndian)
-                {
-                    MemoryMarshal.AsBytes(destination).Reverse();
-                }
-                else
-                {
-                    destination.Reverse();
-                }
-
-                return true;
             }
-
-            if (typeof(T) == typeof(byte))
+            else if (typeof(T) == typeof(byte))
             {
-                const int DigitsPerBlock = 8;
-                ref byte lastWholeBlockStart = ref Unsafe.As<T, byte>(ref Unsafe.Add(ref MemoryMarshal.GetReference(input), input.Length - DigitsPerBlock));
+                if (!HexConverter.TryDecode(SpanCast<T, byte>(input), MemoryMarshal.AsBytes(destination), out _))
+                    return false;
+            }
+            else return false;
 
-                for (int i = 0; i < destination.Length; i++)
-                {
-                    if (!TryParseUnalignedBlockByte(
-                        MemoryMarshal.CreateReadOnlySpan(ref Unsafe.Subtract(ref lastWholeBlockStart, i * DigitsPerBlock), DigitsPerBlock),
-                        out destination[i]))
-                    {
-                        return false;
-                    }
-                }
-
-                return true;
+            if (BitConverter.IsLittleEndian)
+            {
+                MemoryMarshal.AsBytes(destination).Reverse();
+            }
+            else
+            {
+                destination.Reverse();
             }
 
-            throw new NotSupportedException();
+            return true;
         }
     }
 #if NET8_0_OR_GREATER

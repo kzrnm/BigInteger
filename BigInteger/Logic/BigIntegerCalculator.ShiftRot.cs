@@ -15,6 +15,7 @@ namespace Kzrnm.Numerics.Logic
     {
         public static void RotateLeft(Span<uint> bits, long rotateLeftAmount)
         {
+            
             Debug.Assert(Math.Abs(rotateLeftAmount) <= 0x80000000);
 
             const int digitShiftMax = (int)(0x80000000 / 32);

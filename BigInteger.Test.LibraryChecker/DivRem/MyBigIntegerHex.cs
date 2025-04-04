@@ -1,4 +1,4 @@
-﻿using Kzrnm.Competitive.IO;
+using Kzrnm.Competitive.IO;
 
 namespace Kzrnm.Numerics.Test.DivRem
 {
@@ -10,8 +10,13 @@ namespace Kzrnm.Numerics.Test.DivRem
             int n = cr.Int();
             while (--n >= 0)
             {
+#if NET8_0_OR_GREATER
+                var a = ParseHex<BigInteger>(cr.Ascii().AsSpan());
+                var b = ParseHex<BigInteger>(cr.Ascii().AsSpan());
+#else
                 var a = ParseHex<BigInteger>(cr.StringChars());
                 var b = ParseHex<BigInteger>(cr.StringChars());
+#endif
 
                 var quotient = BigInteger.DivRem(a, b, out var remainder);
                 cw.Write(FormatHex(quotient));

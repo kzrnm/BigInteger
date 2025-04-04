@@ -5,7 +5,6 @@ using System;
 using System.Globalization;
 using System.Numerics;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using System.Text;
 
 namespace Kzrnm.Numerics.Logic
@@ -34,19 +33,9 @@ namespace Kzrnm.Numerics.Logic
             where T : unmanaged
         {
             if (typeof(T) == typeof(char))
-#if NET9_0_OR_GREATER
-                return Unsafe.BitCast<ReadOnlySpan<char>, ReadOnlySpan<T>>(v);
-#else
-                return MemoryMarshal.Cast<char, T>(v.AsSpan());
-#endif
+                return SR.SpanCast<char, T>(v.AsSpan());
             if (typeof(T) == typeof(byte))
-            {
-#if NET9_0_OR_GREATER
-                return Unsafe.BitCast<Span<byte>, Span<T>>(Encoding.UTF8.GetBytes(v).AsSpan());
-#else
-                return MemoryMarshal.Cast<byte, T>(Encoding.UTF8.GetBytes(v));
-#endif
-            }
+                return SR.SpanCast<byte, T>(Encoding.UTF8.GetBytes(v));
             return default;
         }
 

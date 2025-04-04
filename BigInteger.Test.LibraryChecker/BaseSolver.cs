@@ -1,4 +1,4 @@
-﻿using Kzrnm.Competitive.IO;
+using Kzrnm.Competitive.IO;
 using System.Globalization;
 using System.Numerics;
 
@@ -13,6 +13,18 @@ namespace Kzrnm.Numerics.Test
         }
         public abstract void Solve(ConsoleReader cr, Utf8ConsoleWriter cw);
 
+#if NET8_0_OR_GREATER
+        public static T ParseHex<T>(ReadOnlySpan<byte> v) where T : INumber<T>
+        {
+            byte[] vv;
+            vv = new byte[v.Length + (v[0] == '-' ? 0 : 1)];
+            v.CopyTo(vv.AsSpan(vv.Length - v.Length));
+            vv[0] = (byte)'0';
+            var ret = T.Parse(vv, NumberStyles.HexNumber, null);
+
+            return v[0] == '-' ? -ret : ret;
+        }
+#endif
         public static T ParseHex<T>(char[] v) where T : INumber<T>
         {
             if (v[0] == '-')

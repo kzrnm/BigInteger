@@ -3,6 +3,7 @@ using System;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Buffers.Text;
+using System.Runtime.InteropServices;
 #if !NET7_0_OR_GREATER
 using System.Buffers;
 using System.Collections.Generic;
@@ -71,7 +72,23 @@ namespace Kzrnm.Numerics
     }
     internal static class SR
     {
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static ReadOnlySpan<T> SpanCast<F, T>(ReadOnlySpan<F> from)
+            where F : unmanaged where T : unmanaged
+#if NET9_0_OR_GREATER
+            => Unsafe.BitCast<ReadOnlySpan<F>, ReadOnlySpan<T>>(from);
+#else
+            => MemoryMarshal.Cast<F, T>(from);
+#endif
+
+        public static Span<T> SpanCast<F, T>(Span<F> from)
+            where F : unmanaged where T : unmanaged
+#if NET9_0_OR_GREATER
+            => Unsafe.BitCast<Span<F>, Span<T>>(from);
+#else
+            => MemoryMarshal.Cast<F, T>(from);
+#endif
+
+        [MethodImpl(256)]
         public static T CastFrom<T>(uint v)
         {
             if (typeof(T) == typeof(char))
@@ -87,7 +104,7 @@ namespace Kzrnm.Numerics
             return default!;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(256)]
         public static uint CastToUInt32<T>(T v)
         {
             if (typeof(T) == typeof(char))

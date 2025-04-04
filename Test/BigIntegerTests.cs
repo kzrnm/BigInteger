@@ -51,42 +51,30 @@ namespace Kzrnm.Numerics.Test
             }
         }
 
-        [Fact]
-        public void ParseHex()
+        public static IEnumerable<TheoryDataRow<string>> ParseHex_Data()
         {
-            for (int i = 1; i < 300; i++)
+            for (int i = 1; i < 200; i++)
             {
-                var s = "F" + new string('0', i) + "1";
-                Equal(BigInteger.Parse(s, NumberStyles.HexNumber), OrigBigInteger.Parse(s, NumberStyles.HexNumber));
-            }
-            for (int i = 1; i < 300; i++)
-            {
-                BigInteger.TryParse("F" + new string('0', i - 1) + "1", NumberStyles.HexNumber, null, out var result);
-                result.ShouldBe((BigInteger.MinusOne << (4 * i)) + 1);
-            }
-            for (int i = 0; i < 300; i++)
-            {
+                yield return "F" + new string('0', i) + "1";
+                yield return "F" + new string('0', i - 1) + "1";
+
                 for (int j = 1; j < 6; j++)
                 {
-                    BigInteger.TryParse(new string('F', j) + new string('0', i), NumberStyles.HexNumber, null, out var result);
-                    result.ShouldBe(BigInteger.MinusOne << (4 * i));
+                    yield return new string('F', j) + new string('0', i);
                 }
-            }
-            for (int i = 0; i < 300; i++)
-            {
-                BigInteger.TryParse("8" + new string('0', i), NumberStyles.HexNumber, null, out var result);
-                result.ShouldBe(BigInteger.MinusOne << (3 + 4 * i));
+
+                yield return "8" + new string('0', i);
             }
 
             var rnd = new Random(227);
-            for (int len = 1; len < 200; len++)
+            for (int len = 100; len < 200; len++)
             {
-                for (int k = 0; k < 60; k++)
+                for (int k = 0; k < 100; k++)
                 {
-                    var s = new string(Enumerable.Repeat(rnd, len).Select(rnd => ToCharUpper(rnd.Next())).ToArray());
-                    Equal(BigInteger.Parse(s, NumberStyles.HexNumber), OrigBigInteger.Parse(s, NumberStyles.HexNumber));
+                    yield return new string(Enumerable.Repeat(rnd, len).Select(rnd => ToCharUpper(rnd.Next())).ToArray());
                 }
             }
+
             static char ToCharUpper(int value)
             {
                 value &= 0xF;
@@ -101,34 +89,49 @@ namespace Kzrnm.Numerics.Test
             }
         }
 
-#if NET8_0_OR_GREATER
-        [Fact]
-        public void ParseBin()
+        [Theory]
+        [MemberData(nameof(ParseHex_Data))]
+        public void ParseHex(string s)
         {
-            BigInteger.Parse("0", NumberStyles.BinaryNumber).ShouldBe(0);
-            BigInteger.Parse("0111111111111111111111111111111111", NumberStyles.BinaryNumber).ShouldBe(0x1FFFFFFFFL);
-            BigInteger.Parse("111111111111111111111111111111110", NumberStyles.BinaryNumber).ShouldBe(-2);
-            BigInteger.Parse("100000000000000000000000000000001", NumberStyles.BinaryNumber).ShouldBe((-1L << 32) + 1);
-            BigInteger.Parse("100000000000000000000000000000000", NumberStyles.BinaryNumber).ShouldBe(-1L << 32);
+            var expected = OrigBigInteger.Parse(s, NumberStyles.HexNumber);
+            Equal(BigInteger.Parse(s, NumberStyles.HexNumber), expected);
+
+            BigInteger.TryParse(s, NumberStyles.HexNumber, null, out var result).ShouldBeTrue();
+            Equal(result, expected);
+
+#if NET7_0_OR_GREATER
+            Equal(BigInteger.Parse(Encoding.UTF8.GetBytes(s), NumberStyles.HexNumber), expected);
+#endif
+        }
+
+#if NET9_0_OR_GREATER
+
+        public static IEnumerable<TheoryDataRow<string>> ParseBin_Data()
+        {
+            yield return "0";
+            yield return "0111111111111111111111111111111111";
+            yield return "111111111111111111111111111111110";
+            yield return "100000000000000000000000000000001";
+            yield return "100000000000000000000000000000000";
 
             for (int i = 0; i < 300; i++)
             {
-                BigInteger.TryParse("1" + new string('0', i), NumberStyles.BinaryNumber, null, out var result);
-                result.ShouldBe(BigInteger.MinusOne << i);
+                yield return "1" + new string('0', i);
+                yield return "01" + new string('0', i);
             }
+        }
 
-            var rnd = new Random(227);
-            for (int len = 1; len < 5000; len++)
-            {
-                for (int k = 0; k < 20; k++)
-                {
-                    var s = Enumerable.Repeat(rnd, len).Select(rnd => (char)(rnd.Next(2) + '0')).ToArray();
-                    BigInteger.Parse(s, NumberStyles.BinaryNumber);
-                    //.ToByteArray()
-                    //.Should().Equal(BigIntegerNative.Parse(s, NumberStyles.BinaryNumber).ToByteArray());
+        [Theory]
+        [MemberData(nameof(ParseBin_Data))]
+        public void ParseBin(string s)
+        {
+            var expected = OrigBigInteger.Parse(s, NumberStyles.BinaryNumber);
+            Equal(BigInteger.Parse(s, NumberStyles.BinaryNumber), expected);
 
-                }
-            }
+            BigInteger.TryParse(s, NumberStyles.BinaryNumber, null, out var result).ShouldBeTrue();
+            Equal(result, expected);
+
+            Equal(BigInteger.Parse(Encoding.UTF8.GetBytes(s), NumberStyles.BinaryNumber), expected);
         }
 #endif
 

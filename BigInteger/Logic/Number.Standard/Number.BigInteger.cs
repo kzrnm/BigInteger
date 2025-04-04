@@ -307,7 +307,7 @@ namespace Kzrnm.Numerics.Logic
         {
             if (typeof(T) == typeof(char))
             {
-                return UIntTryParseX(MemoryMarshal.Cast<T, char>(input), out result);
+                return UIntTryParseX(SpanCast<T, char>(input), out result);
             }
 
             throw new NotSupportedException();
@@ -319,7 +319,7 @@ namespace Kzrnm.Numerics.Logic
         {
             if (typeof(T) == typeof(char))
             {
-                if (!HexConverter.TryDecodeFromUtf16(MemoryMarshal.Cast<T, char>(input), MemoryMarshal.AsBytes(destination), out _))
+                if (!HexConverter.TryDecode(SpanCast<T, char>(input), MemoryMarshal.AsBytes(destination), out _))
                 {
                     return false;
                 }
