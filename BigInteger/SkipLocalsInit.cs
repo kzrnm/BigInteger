@@ -1,1 +1,3 @@
-﻿[module: System.Runtime.CompilerServices.SkipLocalsInit]
+#if !Embedding
+[module: System.Runtime.CompilerServices.SkipLocalsInit]
+#endif

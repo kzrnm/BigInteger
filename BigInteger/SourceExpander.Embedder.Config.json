@@ -19,6 +19,7 @@
     "System.Diagnostics.DebuggerStepThroughAttribute",
     "System.Diagnostics.DebuggerTypeProxyAttribute",
     "System.Diagnostics.DebuggerVisualizerAttribute",
+    "System.Runtime.CompilerServices.SkipLocalsInitAttribute",
     "System.ComponentModel.EditorBrowsableAttribute"
   ]
 }
