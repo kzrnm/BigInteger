@@ -12,7 +12,7 @@
 		<LangVersion Condition="'$(DotnetVersion)' != ''">$([MSBuild]::Add($(DotnetVersion), 4))</LangVersion>
 		<LangVersion Condition="'$(TargetFramework)' == 'netstandard2.0'">11</LangVersion>
 
-		<VersionPrefix>0.5.1</VersionPrefix>
+		<VersionPrefix>0.5.2</VersionPrefix>
 		<VersionSuffix></VersionSuffix>
 		<VersionSuffix Condition="'$(Embedding)' == 'true'">embedded</VersionSuffix>
 
