@@ -2,7 +2,7 @@ using System.Globalization;
 using System.Reflection;
 using System.Text;
 
-namespace Kzrnm.Numerics.Test
+namespace Kzrnm.Numerics.Tests
 {
     public abstract class BigIntegerTestsBase<T> where T : struct
     {
@@ -142,7 +142,7 @@ namespace Kzrnm.Numerics.Test
         }
 
 
-        [Fact]
+        [Test]
         public void Add()
         {
             foreach (var data in Values())
@@ -152,7 +152,7 @@ namespace Kzrnm.Numerics.Test
             }
         }
 
-        [Fact]
+        [Test]
         public void Subtract()
         {
             foreach (var data in Values())
@@ -162,7 +162,7 @@ namespace Kzrnm.Numerics.Test
             }
         }
 
-        [Fact]
+        [Test]
         public void Multiply()
         {
             foreach (var data in Values().Concat(MultiplyValues()))
@@ -173,7 +173,7 @@ namespace Kzrnm.Numerics.Test
             }
         }
 
-        [Fact]
+        [Test]
         public void DivRem()
         {
             foreach (var data in Values().Concat(DivValues()))
@@ -193,7 +193,7 @@ namespace Kzrnm.Numerics.Test
         }
 
 
-        [Fact]
+        [Test]
         public void ParseAndFormat()
         {
             Test("9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999");
@@ -210,7 +210,7 @@ namespace Kzrnm.Numerics.Test
                 var num = (T)Parse(s, null);
                 $"{num}".ShouldBe(s);
                 num.ToString().ShouldBe(s);
-#if NET7_0_OR_GREATER
+#if NET8_0_OR_GREATER
                 {
                     var TryFormatUtf8Delegate = (TryFormatUtf8)Delegate.CreateDelegate(typeof(TryFormatUtf8), num, TryFormatUtf8Method);
                     var dst = new byte[s.Length];
@@ -222,7 +222,7 @@ namespace Kzrnm.Numerics.Test
             }
         }
 
-        [Fact]
+        [Test]
         public void ParseAndToStringTest()
         {
             foreach (int i in new int[] { 865, 20161 })

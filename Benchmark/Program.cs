@@ -23,7 +23,7 @@ public class BenchmarkConfig : ManualConfig
         //AddDiagnoser(MemoryDiagnoser.Default);
         AddExporter(BenchmarkDotNet.Exporters.MarkdownExporter.GitHub);
         AddJob(Job.ShortRun.WithToolchain(CsProjClassicNetToolchain.Net481));
-        AddJob(Job.ShortRun.WithToolchain(CsProjCoreToolchain.NetCoreApp70));
+        AddJob(Job.ShortRun.WithToolchain(CsProjCoreToolchain.NetCoreApp80));
         AddJob(Job.ShortRun.WithToolchain(CsProjCoreToolchain.NetCoreApp90));
 
         HideColumns("Error", "StdDev", "Median", "RatioSD");

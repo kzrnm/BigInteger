@@ -14,7 +14,7 @@ env:
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
   DOTNET_NOLOGO: true
   NUGET_XMLDOC_MODE: skip
-  WORKFLOW_BUILD_SLN: BigInteger.sln
+  WORKFLOW_BUILD_SLN: BigInteger.slnx
 
 jobs:
   build-resolve:
@@ -27,10 +27,10 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: |
+            10.0.x
             9.0.x
             8.0.x
             7.0.x
-            6.0.x
       - uses: actions/cache@v4
         with:
           path: ~/.nuget/packages
@@ -40,10 +40,7 @@ jobs:
 
       - name: Trim solution
         run: |
-          sed -i -e '/{A5D5BABD-B64E-439B-9904-068AE1432504}\./d' $WORKFLOW_BUILD_SLN
-          sed -i -e '/{A5D5BABD-B64E-439B-9904-068AE1432504} =/d' $WORKFLOW_BUILD_SLN
-          sed -i -e '/= "BigInteger.Benchmark"/d' $WORKFLOW_BUILD_SLN
-          sed -i -E "N;s/EndProject\r?\nEndProject/EndProject/g" $WORKFLOW_BUILD_SLN
+          sed -i -e "/BigInteger.Benchmark/d" $WORKFLOW_BUILD_SLN
 
       - name: Build
         shell: bash
@@ -62,11 +59,6 @@ jobs:
         env:
           VERIFY_CSPROJ: BigInteger.Test.LibraryChecker/BigInteger.Test.LibraryChecker.csproj
           FRAMEWORK: net8.0
-      - name: Resolve net7.0
-        run: dotnet run --project $VERIFY_CSPROJ --framework $FRAMEWORK --no-launch-profile --no-build -c Release | tee "${{runner.temp}}/problems-$FRAMEWORK.json"
-        env:
-          VERIFY_CSPROJ: BigInteger.Test.LibraryChecker/BigInteger.Test.LibraryChecker.csproj
-          FRAMEWORK: net7.0
 
       - name: cs-resolve
         uses: competitive-verifier/actions/cs-resolve@v2

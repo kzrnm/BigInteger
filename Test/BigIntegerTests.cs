@@ -3,12 +3,12 @@ using System.Globalization;
 using System.Numerics;
 using System.Text;
 
-namespace Kzrnm.Numerics.Test
+namespace Kzrnm.Numerics.Tests
 {
     using BigInteger = MyBigInteger;
     public class BigIntegerTests : BigIntegerTestsBase<BigInteger>
     {
-        [Fact]
+        [Test]
         public void DivideBound()
         {
             var right = (BigInteger.One << (BigIntegerCalculator.DivideBurnikelZieglerThreshold * 4 * 32 - 1))
@@ -27,7 +27,7 @@ namespace Kzrnm.Numerics.Test
             }
         }
 
-        [Fact]
+        [Test]
         public void Powers1e9()
         {
             var buffer = new uint[5356];
@@ -51,7 +51,7 @@ namespace Kzrnm.Numerics.Test
             }
         }
 
-        public static IEnumerable<TheoryDataRow<string>> ParseHex_Data()
+        public static IEnumerable<string> ParseHex_Data()
         {
             for (int i = 1; i < 200; i++)
             {
@@ -89,8 +89,8 @@ namespace Kzrnm.Numerics.Test
             }
         }
 
-        [Theory]
-        [MemberData(nameof(ParseHex_Data))]
+        [Test]
+        [MethodDataSource(nameof(ParseHex_Data))]
         public void ParseHex(string s)
         {
             var expected = OrigBigInteger.Parse(s, NumberStyles.HexNumber);
@@ -99,14 +99,14 @@ namespace Kzrnm.Numerics.Test
             BigInteger.TryParse(s, NumberStyles.HexNumber, null, out var result).ShouldBeTrue();
             Equal(result, expected);
 
-#if NET7_0_OR_GREATER
+#if NET8_0_OR_GREATER
             Equal(BigInteger.Parse(Encoding.UTF8.GetBytes(s), NumberStyles.HexNumber), expected);
 #endif
         }
 
 #if NET9_0_OR_GREATER
 
-        public static IEnumerable<TheoryDataRow<string>> ParseBin_Data()
+        public static IEnumerable<string> ParseBin_Data()
         {
             yield return "0";
             yield return "0111111111111111111111111111111111";
@@ -121,8 +121,8 @@ namespace Kzrnm.Numerics.Test
             }
         }
 
-        [Theory]
-        [MemberData(nameof(ParseBin_Data))]
+        [Test]
+        [MethodDataSource(nameof(ParseBin_Data))]
         public void ParseBin(string s)
         {
             var expected = OrigBigInteger.Parse(s, NumberStyles.BinaryNumber);
@@ -135,7 +135,7 @@ namespace Kzrnm.Numerics.Test
         }
 #endif
 
-        [Fact]
+        [Test]
         public void RandomDivRem()
         {
             var rnd = new Random(227);
@@ -204,7 +204,7 @@ namespace Kzrnm.Numerics.Test
             }
         }
 
-        [Fact]
+        [Test]
         public void ToStringTest()
         {
             var rnd = new Random(227);
@@ -257,7 +257,7 @@ namespace Kzrnm.Numerics.Test
         }
 
 
-        [Fact]
+        [Test]
         public void ToStringBoundTest()
         {
             foreach (var s in new[]
@@ -275,7 +275,7 @@ namespace Kzrnm.Numerics.Test
             }
         }
 
-        [Fact]
+        [Test]
         public void ParseAndToStringHexTest()
         {
             Test("F0000001");
@@ -329,15 +329,15 @@ namespace Kzrnm.Numerics.Test
                 var orig = OrigBigInteger.Parse(s, NumberStyles.HexNumber, null);
                 Equal(my, orig);
 
-#if NET7_0_OR_GREATER
+#if NET8_0_OR_GREATER
                 my = BigInteger.Parse(Encoding.UTF8.GetBytes(s), NumberStyles.HexNumber, null);
                 Equal(my, orig);
 #endif
             }
         }
 
-#if NET7_0_OR_GREATER
-        [Fact]
+#if NET8_0_OR_GREATER
+        [Test]
         public void ParseAndFormatCurrency()
         {
             Test("¤999,999,999,999,999,999,999,999,999,999,999,999,999,999,999,999,999,999,999.00");
@@ -358,10 +358,10 @@ namespace Kzrnm.Numerics.Test
 #endif
     }
 
-    [Collection(nameof(DisableParallelization))]
+    [NotInParallel]
     public class BigIntegerThresholdTests : ThresholdTestsBase
     {
-        [Fact]
+        [Test]
         public void ParseTrailingZero()
         {
             RunWithFakeThreshold(Number.BigIntegerParseNaiveThresholdInRecursive, 12, () =>

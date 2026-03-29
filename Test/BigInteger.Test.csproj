@@ -1,8 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFrameworks Condition="'$(GITHUB_ACTIONS)' != 'true'">net9.0;net8.0;net7.0;net48</TargetFrameworks>
-		<TargetFrameworks Condition="'$(GITHUB_ACTIONS)' == 'true'">net9.0;net8.0;net7.0;net6.0</TargetFrameworks>
+		<TargetFrameworks>net9.0;net8.0;net7.0</TargetFrameworks>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 		<LangVersion>latest</LangVersion>
@@ -11,28 +10,25 @@
 		<IsPackable>false</IsPackable>
 		<IsTestProject>true</IsTestProject>
 		<RootNamespace>Kzrnm.Numerics</RootNamespace>
+		<SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
+		<SuppressTfmSupportBuildErrors>true</SuppressTfmSupportBuildErrors>
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="GitHubActionsTestLogger" Version="2.4.1">
-		  <PrivateAssets>all</PrivateAssets>
-		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-		</PackageReference>
-		<PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.13.0" />
+		<PackageReference Include="GitHubActionsTestLogger" Version="3.0.2" />
+		<PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.3.0" />
 		<PackageReference Include="Shouldly" Version="4.3.0" />
-		<PackageReference Include="xunit.v3" Version="1.1.0" />
-		<PackageReference Include="xunit.runner.visualstudio" Version="3.0.2">
-			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-			<PrivateAssets>all</PrivateAssets>
-		</PackageReference>
-		<PackageReference Include="coverlet.collector" Version="6.0.4">
-			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-			<PrivateAssets>all</PrivateAssets>
-		</PackageReference>
+		<PackageReference Include="TUnit" Version="1.22.6" />
 	</ItemGroup>
 
 	<ItemGroup>
 		<ProjectReference Include="..\BigInteger\BigInteger.csproj" />
 	</ItemGroup>
 
+	<ItemGroup>
+		<Using Include="Shouldly" />
+		<Using Alias="MyBigInteger" Include="Kzrnm.Numerics.BigInteger" />
+		<Using Alias="OrigBigInteger" Include="System.Numerics.BigInteger" />
+		<Using Alias="BitOperations" Include="System.Numerics.BitOperations" Condition="'$(TargetFramework)' == 'net6.0'" />
+	</ItemGroup>
 </Project>

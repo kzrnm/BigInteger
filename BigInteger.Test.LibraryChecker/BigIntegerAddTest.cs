@@ -1,7 +1,7 @@
 ﻿using Kzrnm.Competitive.IO;
 using System.Numerics;
 
-namespace Kzrnm.Numerics.Test
+namespace Kzrnm.Numerics.Tests
 {
     internal abstract class BigIntegerAddTest<T> : BaseSolver where T : INumber<T>, IParsable<T>
     {

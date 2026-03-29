@@ -1,4 +1,4 @@
-﻿namespace Kzrnm.Numerics.Test.Multiply
+﻿namespace Kzrnm.Numerics.Tests.Multiply
 {
     internal class MyBigIntegerMultiplyTest : BigIntegerMultiplyTest<BigInteger> { }
 }

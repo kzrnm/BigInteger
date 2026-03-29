@@ -1,11 +1,11 @@
 #if !NETCOREAPP3_1_OR_GREATER
 using System.Numerics;
 
-namespace Kzrnm.Numerics.Test
+namespace Kzrnm.Numerics.Tests
 {
     public class BitOperationsTests
     {
-        [Fact]
+        [Test]
         public void Log2()
         {
             Test(1u);
@@ -30,7 +30,7 @@ namespace Kzrnm.Numerics.Test
             }
         }
 
-        [Fact]
+        [Test]
         public void LeadingZeroCount()
         {
             Test(1u);
@@ -55,7 +55,7 @@ namespace Kzrnm.Numerics.Test
             }
         }
 
-        [Fact]
+        [Test]
         public void TrailingZeroCount()
         {
             Test(1u);
@@ -80,7 +80,7 @@ namespace Kzrnm.Numerics.Test
             }
         }
 
-        [Fact]
+        [Test]
         public void PopCount()
         {
             Test(1u);
@@ -105,7 +105,7 @@ namespace Kzrnm.Numerics.Test
             }
         }
 
-        [Fact]
+        [Test]
         public void RoundUpToPowerOf2()
         {
             Test(1u);

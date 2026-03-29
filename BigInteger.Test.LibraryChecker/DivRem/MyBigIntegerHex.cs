@@ -1,6 +1,6 @@
 using Kzrnm.Competitive.IO;
 
-namespace Kzrnm.Numerics.Test.DivRem
+namespace Kzrnm.Numerics.Tests.DivRem
 {
     internal class MyBigIntegerDivRemHexTest : BaseSolver
     {

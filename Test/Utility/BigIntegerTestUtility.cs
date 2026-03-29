@@ -1,4 +1,4 @@
-namespace Kzrnm.Numerics.Test
+namespace Kzrnm.Numerics.Tests
 {
     public static class BigIntegerTestUtility
     {

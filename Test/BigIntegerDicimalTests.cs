@@ -1,10 +1,10 @@
 using Kzrnm.Numerics.Logic;
 
-namespace Kzrnm.Numerics.Test
+namespace Kzrnm.Numerics.Tests
 {
     public class BigIntegerDecimalTests : BigIntegerTestsBase<BigIntegerDecimal>
     {
-        [Fact]
+        [Test]
         public void DivideBound()
         {
             var right = BigIntegerDecimal.Parse("1"
@@ -17,7 +17,7 @@ namespace Kzrnm.Numerics.Test
                 var qi = BigIntegerCalculator.DivideBurnikelZieglerThreshold * 8 * 32 * 4 - 10 + i;
                 var q = BigIntegerDecimal.Parse(new string('9', qi));
                 var left = q * right + rem;
-
+                
                 var (q2, r2) = BigIntegerDecimal.DivRem(left, right);
                 q2.ShouldBe(q);
                 r2.ShouldBe(rem);

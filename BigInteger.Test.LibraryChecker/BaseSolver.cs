@@ -2,7 +2,7 @@ using Kzrnm.Competitive.IO;
 using System.Globalization;
 using System.Numerics;
 
-namespace Kzrnm.Numerics.Test
+namespace Kzrnm.Numerics.Tests
 {
     internal abstract class BaseSolver : CompetitiveVerifier.ProblemSolver
     {
