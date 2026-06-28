@@ -6,14 +6,14 @@ using System.Diagnostics;
 
 namespace Kzrnm.Numerics.Logic
 {
-#if Embedding
+#if SOURCE_EMBEDDING
     public
 #else
     internal
 #endif
     static partial class BigIntegerCalculator
     {
-#if DEBUG && !Embedding
+#if DEBUG && !SOURCE_EMBEDDING
         // Mutable for unit testing...
         internal static
 #else

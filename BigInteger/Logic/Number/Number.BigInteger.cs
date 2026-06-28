@@ -16,7 +16,7 @@ using System.Text;
 namespace Kzrnm.Numerics.Logic
 {
     using static SR;
-#if Embedding
+#if SOURCE_EMBEDDING
     public
 #else
     internal
@@ -318,7 +318,7 @@ namespace Kzrnm.Numerics.Logic
         // of most common inputs and allows for the less naive algorithm to be used for
         // large/uncommon inputs.
         //
-#if DEBUG && !Embedding
+#if DEBUG && !SOURCE_EMBEDDING
         // Mutable for unit testing...
         public static
 #else
@@ -1008,7 +1008,7 @@ namespace Kzrnm.Numerics.Logic
             return UInt32ToDecChars(buffer, base1E9Value[^1], digits);
         }
 
-#if DEBUG && !Embedding
+#if DEBUG && !SOURCE_EMBEDDING
         // Mutable for unit testing...
         public static
 #else

@@ -46,7 +46,7 @@ namespace Kzrnm.Numerics.Decimal
        };
 #endif
 
-#if DEBUG && !Embedding
+#if DEBUG && !SOURCE_EMBEDDING
         // Mutable for unit testing...
         internal static
 #else

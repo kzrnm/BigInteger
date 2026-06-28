@@ -72,9 +72,7 @@ namespace Kzrnm.Numerics
         //
         // Code coverage note: This only exists so that Number displays nicely in the VS watch window. So yes, I know it works.
         //
-#if Embedding
         [SourceExpander.NotEmbeddingSource]
-#endif
         public override string ToString()
         {
             var sb = new System.Text.StringBuilder();

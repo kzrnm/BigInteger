@@ -1649,9 +1649,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
             return Number.FormatBigInteger(this, format, NumberFormatInfo.GetInstance(provider));
         }
 
-#if Embedding
         [SourceExpander.NotEmbeddingSource]
-#endif
         private string DebuggerDisplay
         {
             get
@@ -4965,7 +4963,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
 
         public static bool TryParse(ReadOnlySpan<byte> utf8, out BigInteger result)
             => TryParse(utf8, NumberStyles.Integer, NumberFormatInfo.CurrentInfo, out result);
-        
+
         public static bool TryParse(ReadOnlySpan<byte> utf8, NumberStyles style, IFormatProvider? provider, out BigInteger result)
             => Number.TryParseBigInteger(utf8, style, NumberFormatInfo.GetInstance(provider), out result) == ParsingStatus.OK;
         public static BigInteger Parse(ReadOnlySpan<byte> utf8, IFormatProvider? provider) => Parse(utf8, NumberStyles.Integer, provider);

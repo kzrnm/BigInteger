@@ -14,12 +14,7 @@
 
 		<VersionPrefix>0.5.3</VersionPrefix>
 		<VersionSuffix></VersionSuffix>
-		<VersionSuffix Condition="'$(Embedding)' == 'true'">embedded</VersionSuffix>
-
 		<AssemblyVersion>$(VersionPrefix).1</AssemblyVersion>
-		<AssemblyVersion Condition="'$(Embedding)' == 'true'">$(VersionPrefix).1001</AssemblyVersion>
-
-		<DefineConstants Condition="'$(Embedding)' == 'true'">$(DefineConstants);Embedding</DefineConstants>
 
 		<PackageTags>BigInteger</PackageTags>
 		<PackageId>Kzrnm.BigInteger</PackageId>
@@ -61,11 +56,11 @@
 	
 	<ItemGroup>
 		<InternalsVisibleTo Include="BigInteger.Test" />
-		<PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.201">
+		<PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.300">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
-		<PackageReference Include="SourceExpander.Embedder" Version="8.2.0" Condition="'$(Embedding)' == 'true'">
+		<PackageReference Include="SourceExpander.Embedder" Version="9.0.0">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>

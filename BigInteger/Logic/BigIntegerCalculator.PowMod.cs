@@ -303,7 +303,7 @@ namespace Kzrnm.Numerics.Logic
                 ArrayPool<uint>.Shared.Return(tempFromPool);
         }
 
-#if DEBUG && !Embedding
+#if DEBUG && !SOURCE_EMBEDDING
         // Mutable for unit testing...
         internal static
 #else

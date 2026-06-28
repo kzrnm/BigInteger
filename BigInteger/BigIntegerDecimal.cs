@@ -890,9 +890,7 @@ https://github.com/dotnet/runtime/blob/master/LICENSE.TXT
         public string ToString([StringSyntax(StringSyntaxAttribute.NumericFormat)] string? format, IFormatProvider? provider)
             => ToString();
 
-#if Embedding
         [SourceExpander.NotEmbeddingSource]
-#endif
         private string DebuggerDisplay
         {
             get

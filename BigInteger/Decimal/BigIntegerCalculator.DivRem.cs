@@ -11,7 +11,7 @@ namespace Kzrnm.Numerics.Decimal
 {
     static partial class BigIntegerCalculator
     {
-#if DEBUG && !Embedding
+#if DEBUG && !SOURCE_EMBEDDING
         // Mutable for unit testing...
         internal static
 #else
