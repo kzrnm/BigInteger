@@ -33,12 +33,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
     needs: get-version
-    strategy:
-      matrix:
-        target:
-          - configuration: Release
-          - configuration: Debug
-            property: -property:Embedding=true
     steps:
       - uses: actions/checkout@v7
       - name: Setup .NET
@@ -56,33 +50,16 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nuget-
       - name: Build
-        run: dotnet build ${{ env.WORKFLOW_BUILD_SLN }} -c ${{ matrix.target.configuration }} ${{ matrix.target.property }}
+        run: dotnet build ${{ env.WORKFLOW_BUILD_SLN }} -c Release
       - name: Test
-        run: dotnet test --solution ${{ env.WORKFLOW_BUILD_SLN }} --no-build --report-github -c ${{ matrix.target.configuration }} ${{ matrix.target.property }}
+        run: dotnet test --solution ${{ env.WORKFLOW_BUILD_SLN }} --no-build --report-github -c Release
       - name: Pack
-        run: dotnet pack ${{ env.PACK_CSPROJ }} --no-build -c ${{ matrix.target.configuration }} -o bin/Packages/${{ matrix.target.configuration }} ${{ matrix.target.property }}
+        run: dotnet pack ${{ env.PACK_CSPROJ }} --no-build -c Release -o bin/Packages/Release
       - uses: actions/upload-artifact@v7
-        with:
-          name: dist-${{ matrix.target.configuration }}
-          path: bin/Packages/${{ matrix.target.configuration }}
-          retention-days: 1
-
-  merge:
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - uses: actions/download-artifact@v8
-        with:
-          name: dist-Debug
-          path: Package
-      - uses: actions/download-artifact@v8
         with:
           name: dist-Release
-          path: Package
-      - uses: actions/upload-artifact@v7
-        with:
-          name: dist
-          path: Package
+          path: bin/Packages/Release
+          retention-days: 1
 
   publish:
     needs: [get-version, verify, build]
