@@ -70,24 +70,10 @@
 
 	<!-- SouceExpander -->
 	<PropertyGroup>
-		<EmbeddedPackageId>$(PackageId.Replace('.', '_'))</EmbeddedPackageId>
-		<BuildProps>
-&lt;Project&gt;
-	&lt;PropertyGroup&gt;
-		&lt;$(EmbeddedPackageId)_Source&gt;%24(MSBuildThisFileDirectory)$(EmbeddedPackageId)_SourceExpander.Embedded.json&lt;/$(EmbeddedPackageId)_Source&gt;
-	&lt;/PropertyGroup&gt;
-&lt;/Project&gt;
-		</BuildProps>
-		<BuildTargets>
-&lt;Project&gt;
-	&lt;ItemGroup&gt;
-		&lt;AdditionalFiles Condition="'%24(SourceExpander_Generator)'=='true' And Exists('%24($(EmbeddedPackageId)_Source)')" Include="%24($(EmbeddedPackageId)_Source)" LinkBase="Properties/SourceExpander.Embedded" /&gt;
-	&lt;/ItemGroup&gt;
-&lt;/Project&gt;
-		</BuildTargets>
+		<EmbeddedJson>$(PackageId.Replace('.', '_'))_SourceExpander.Embedded.json</EmbeddedJson>
 	</PropertyGroup>
 	<Target Name="EmbeddedJson" AfterTargets="_GetPackageFiles" Condition="Exists('$(TargetPath)') And '$(TargetFramework)' != 'netstandard2.0'">
-		<Exec Command="dotnet source-expand embedded &quot;$(TargetPath)&quot; --output &quot;$(TargetPath).new&quot; &gt; &quot;$(TargetDir)$(EmbeddedPackageId)_SourceExpander.Embedded.json&quot;" />
+		<Exec Command="dotnet source-expand embedded &quot;$(TargetPath)&quot; --output &quot;$(TargetPath).new&quot; &gt; &quot;$(TargetDir)$(EmbeddedJson)&quot;" />
 		<Move SourceFiles="$(TargetPath).new" DestinationFiles="$(TargetPath)" Condition="Exists('$(TargetPath).new')" />
 
 		<WriteLinesToFile File="$(OutputPath)SourceExpander.Embedded.props" Overwrite="true" Lines="$(BuildProps)" />
@@ -101,7 +87,7 @@
 				IncludeInPackage="true"
 				CopyToOutputDirectory="Never" />
 			<TfmSpecificPackageFile
-				Include="$(OutputPath)*SourceExpander.Embedded.*"
+				Include="$(OutputPath)*SourceExpander.Embedded.json"
 				PackagePath="buildTransitive/$(TargetFramework)"
 				IncludeInPackage="true"
 				CopyToOutputDirectory="Never" />
