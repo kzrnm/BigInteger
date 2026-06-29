@@ -59,7 +59,7 @@ jobs:
         run: dotnet pack ${{ env.PACK_CSPROJ }} --no-build -c Release -o bin/Packages/Release
       - uses: actions/upload-artifact@v7
         with:
-          name: dist-Release
+          name: dist
           path: bin/Packages/Release
           retention-days: 1
 
