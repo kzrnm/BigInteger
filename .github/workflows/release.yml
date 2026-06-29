@@ -49,6 +49,8 @@ jobs:
           key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/Directory.Build.props') }}
           restore-keys: |
             ${{ runner.os }}-nuget-
+      - name: Install SourceExpander.Console
+        run: dotnet tool install --global SourceExpander.Console
       - name: Build
         run: dotnet build ${{ env.WORKFLOW_BUILD_SLN }} -c Release
       - name: Test

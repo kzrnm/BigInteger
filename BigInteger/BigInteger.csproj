@@ -86,7 +86,7 @@
 &lt;/Project&gt;
 		</BuildTargets>
 	</PropertyGroup>
-	<Target Name="EmbeddedJson" AfterTargets="Build" Condition="'$(Configuration)'=='Release' And Exists('$(TargetPath)') And '$(TargetFramework)' != 'netstandard2.0'">
+	<Target Name="EmbeddedJson" AfterTargets="_GetPackageFiles" Condition="Exists('$(TargetPath)') And '$(TargetFramework)' != 'netstandard2.0'">
 		<Exec Command="dotnet source-expand embedded &quot;$(TargetPath)&quot; --output &quot;$(TargetPath).new&quot; &gt; &quot;$(TargetDir)$(EmbeddedPackageId)_SourceExpander.Embedded.json&quot;" />
 		<Move SourceFiles="$(TargetPath).new" DestinationFiles="$(TargetPath)" Condition="Exists('$(TargetPath).new')" />
 
