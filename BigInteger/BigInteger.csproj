@@ -12,7 +12,7 @@
 		<LangVersion Condition="'$(DotnetVersion)' != ''">$([MSBuild]::Add($(DotnetVersion), 4))</LangVersion>
 		<LangVersion Condition="'$(TargetFramework)' == 'netstandard2.0'">11</LangVersion>
 
-		<VersionPrefix>0.5.3</VersionPrefix>
+		<VersionPrefix>0.5.5</VersionPrefix>
 		<VersionSuffix></VersionSuffix>
 		<AssemblyVersion>$(VersionPrefix).1</AssemblyVersion>
 
@@ -31,6 +31,8 @@
 		<IncludeSymbols>true</IncludeSymbols>
 		<SymbolPackageFormat>snupkg</SymbolPackageFormat>
 
+		<SourceExpander_Embedder_Enabled Condition="'$(TargetFramework)' == 'netstandard2.0'">false</SourceExpander_Embedder_Enabled>
+		<TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);PackBuildOutputs</TargetsForTfmSpecificContentInPackage>
 		<PolySharpExcludeGeneratedTypes>System.Runtime.CompilerServices.ModuleInitializerAttribute</PolySharpExcludeGeneratedTypes>
 	</PropertyGroup>
 
@@ -53,7 +55,7 @@
 		<Compile Remove="Logic/Number.Standard/*.cs" />
 		<None Include="Logic/Number.Standard/*.cs" />
 	</ItemGroup>
-	
+
 	<ItemGroup>
 		<InternalsVisibleTo Include="BigInteger.Test" />
 		<PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.300">
@@ -65,4 +67,44 @@
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
 	</ItemGroup>
+
+	<!-- SouceExpander -->
+	<PropertyGroup>
+		<EmbeddedPackageId>$(PackageId.Replace('.', '_'))</EmbeddedPackageId>
+		<BuildProps>
+&lt;Project&gt;
+	&lt;PropertyGroup&gt;
+		&lt;$(EmbeddedPackageId)_Source&gt;%24(MSBuildThisFileDirectory)$(EmbeddedPackageId)_SourceExpander.Embedded.json&lt;/$(EmbeddedPackageId)_Source&gt;
+	&lt;/PropertyGroup&gt;
+&lt;/Project&gt;
+		</BuildProps>
+		<BuildTargets>
+&lt;Project&gt;
+	&lt;ItemGroup&gt;
+		&lt;AdditionalFiles Condition="'%24(SourceExpander_Generator)'=='true' And Exists('%24($(EmbeddedPackageId)_Source)')" Include="%24($(EmbeddedPackageId)_Source)" LinkBase="Properties/SourceExpander.Embedded" /&gt;
+	&lt;/ItemGroup&gt;
+&lt;/Project&gt;
+		</BuildTargets>
+	</PropertyGroup>
+	<Target Name="EmbeddedJson" AfterTargets="Build" Condition="'$(Configuration)'=='Release' And Exists('$(TargetPath)') And '$(TargetFramework)' != 'netstandard2.0'">
+		<Exec Command="dotnet source-expand embedded &quot;$(TargetPath)&quot; --output &quot;$(TargetPath).new&quot; &gt; &quot;$(TargetDir)$(EmbeddedPackageId)_SourceExpander.Embedded.json&quot;" />
+		<Move SourceFiles="$(TargetPath).new" DestinationFiles="$(TargetPath)" Condition="Exists('$(TargetPath).new')" />
+
+		<WriteLinesToFile File="$(OutputPath)SourceExpander.Embedded.props" Overwrite="true" Lines="$(BuildProps)" />
+		<WriteLinesToFile File="$(OutputPath)SourceExpander.Embedded.targets" Overwrite="true" Lines="$(BuildTargets)" />
+	</Target>
+	<Target Name="PackBuildOutputs" DependsOnTargets="EmbeddedJson" Condition="'$(TargetFramework)' != 'netstandard2.0'">
+		<ItemGroup>
+			<TfmSpecificPackageFile
+				Include="build/**"
+				PackagePath="buildTransitive/$(TargetFramework)"
+				IncludeInPackage="true"
+				CopyToOutputDirectory="Never" />
+			<TfmSpecificPackageFile
+				Include="$(OutputPath)*SourceExpander.Embedded.*"
+				PackagePath="buildTransitive/$(TargetFramework)"
+				IncludeInPackage="true"
+				CopyToOutputDirectory="Never" />
+		</ItemGroup>
+	</Target>
 </Project>
