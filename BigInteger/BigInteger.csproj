@@ -13,8 +13,8 @@
 		<LangVersion Condition="'$(TargetFramework)' == 'netstandard2.0'">11</LangVersion>
 
 		<VersionPrefix>0.6.0</VersionPrefix>
-		<VersionSuffix>alpha3</VersionSuffix>
-		<AssemblyVersion>$(VersionPrefix).3</AssemblyVersion>
+		<VersionSuffix>alpha4</VersionSuffix>
+		<AssemblyVersion>$(VersionPrefix).4</AssemblyVersion>
 
 		<PackageTags>BigInteger</PackageTags>
 		<PackageId>Kzrnm.BigInteger</PackageId>
