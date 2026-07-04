@@ -1,5 +1,0 @@
-<Project>
-	<PropertyGroup>
-		<Kzrnm_BigInteger_Source>$(MSBuildThisFileDirectory)Kzrnm_BigInteger_SourceExpander.Embedded.json</Kzrnm_BigInteger_Source>
-	</PropertyGroup>
-</Project>

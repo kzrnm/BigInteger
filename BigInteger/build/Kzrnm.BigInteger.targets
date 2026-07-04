@@ -1,8 +1,0 @@
-<Project>
-	<ItemGroup>
-		<AdditionalFiles
-			Condition="'$(SourceExpander_Generator)'=='true' And '$(Kzrnm_BigInteger_Source)'=='true' And Exists('$(Kzrnm_BigInteger_Source)')"
-			Include="$(Kzrnm_BigInteger_Source)"
-			LinkBase="Properties/SourceExpander.Embedded" />
-	</ItemGroup>
-</Project>
