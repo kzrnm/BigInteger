@@ -6,12 +6,8 @@ using System.Diagnostics;
 
 namespace Kzrnm.Numerics.Logic
 {
-#if SOURCE_EMBEDDING
-    public
-#else
-    internal
-#endif
-    static partial class BigIntegerCalculator
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    public static partial class BigIntegerCalculator
     {
 #if DEBUG && !SOURCE_EMBEDDING
         // Mutable for unit testing...
