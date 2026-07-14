@@ -13,8 +13,8 @@
 		<LangVersion Condition="'$(TargetFramework)' == 'netstandard2.0'">11</LangVersion>
 
 		<VersionPrefix>0.6.0</VersionPrefix>
-		<VersionSuffix>alpha4</VersionSuffix>
-		<AssemblyVersion>$(VersionPrefix).4</AssemblyVersion>
+		<VersionSuffix>alpha5</VersionSuffix>
+		<AssemblyVersion>$(VersionPrefix).5</AssemblyVersion>
 
 		<PackageTags>BigInteger</PackageTags>
 		<PackageId>Kzrnm.BigInteger</PackageId>
@@ -63,7 +63,7 @@
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
-		<PackageReference Include="SourceExpander.Embedder.PackJson" Version="9.0.2-beta3">
+		<PackageReference Include="SourceExpander.Embedder.PackJson" Version="9.0.2-beta6">
 		  <PrivateAssets>all</PrivateAssets>
 		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
