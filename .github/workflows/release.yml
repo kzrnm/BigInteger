@@ -52,7 +52,9 @@ jobs:
       - name: Install SourceExpander.Console
         run: dotnet tool install --global SourceExpander.Console
       - name: Build
-        run: dotnet build ${{ env.WORKFLOW_BUILD_SLN }} -c Release
+        run: |
+          dotnet build ${{ env.WORKFLOW_BUILD_SLN }} -c Release -p:BuildJson=true
+          dotnet build ${{ env.WORKFLOW_BUILD_SLN }} -c Release
       - name: Test
         run: dotnet test --solution ${{ env.WORKFLOW_BUILD_SLN }} --no-build --report-github -c Release
       - name: Pack

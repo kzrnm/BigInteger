@@ -13,11 +13,12 @@
 		<LangVersion Condition="'$(TargetFramework)' == 'netstandard2.0'">11</LangVersion>
 
 		<VersionPrefix>0.6.0</VersionPrefix>
-		<VersionSuffix>alpha5</VersionSuffix>
-		<AssemblyVersion>$(VersionPrefix).5</AssemblyVersion>
+		<VersionSuffix>alpha6</VersionSuffix>
+		<AssemblyVersion>$(VersionPrefix).6</AssemblyVersion>
 
 		<PackageTags>BigInteger</PackageTags>
 		<PackageId>Kzrnm.BigInteger</PackageId>
+		<IsPackable>true</IsPackable>
 		<Description>Faster port of BigInteger</Description>
 
 		<Authors>kzrnm</Authors>
@@ -32,7 +33,8 @@
 		<SymbolPackageFormat>snupkg</SymbolPackageFormat>
 
 		<SourceExpander_Embedder_MinifyLevel>full</SourceExpander_Embedder_MinifyLevel>
-		<SourceExpander_PackJson_Enabled Condition="'$(TargetFramework)' == 'netstandard2.0' Or '$(Configuration)' != 'Release'">false</SourceExpander_PackJson_Enabled>
+		<SourceExpander_Embedder_PackJson Condition="'$(BuildJson)' == 'true'">true</SourceExpander_Embedder_PackJson>
+		<SourceExpander_Embedder_VersionOnly Condition="'$(BuildJson)' != 'true'">true</SourceExpander_Embedder_VersionOnly>
 		<SourceExpander_Embedder_Enabled Condition="'$(TargetFramework)' == 'netstandard2.0'">false</SourceExpander_Embedder_Enabled>
 		<PolySharpExcludeGeneratedTypes>System.Runtime.CompilerServices.ModuleInitializerAttribute</PolySharpExcludeGeneratedTypes>
 	</PropertyGroup>
@@ -63,7 +65,7 @@
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
-		<PackageReference Include="SourceExpander.Embedder.PackJson" Version="9.0.2-beta6">
+		<PackageReference Include="SourceExpander.Embedder" Version="9.1.0-alpha4">
 		  <PrivateAssets>all</PrivateAssets>
 		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
